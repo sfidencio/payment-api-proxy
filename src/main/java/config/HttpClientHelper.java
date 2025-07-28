@@ -1,0 +1,29 @@
+package config;
+
+import java.net.http.HttpClient;
+
+public class HttpClientHelper {
+
+    private HttpClientHelper() {
+        throw new IllegalStateException("Utility class");
+    }
+
+    /**
+     * Returns a singleton instance of HttpClient.
+     *
+     * @return HttpClient instance
+     */
+    public static final HttpClient getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    /**
+     * Garanteeing that the HttpClient instance is created
+     * only once and is thread-safe.
+     */
+    private static class Holder {
+        private static final HttpClient INSTANCE = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_2)
+                .build();
+    }
+}
