@@ -1,10 +1,14 @@
 package dto;
 
+import com.google.gson.annotations.Expose;
+
 import java.time.Instant;
 
 public record GatewayHealth(
-        boolean healthy,
-        long minResponseTimeMs,
+        @Expose
+        boolean failing,
+        @Expose
+        long minResponseTime,
         Instant lastChecked
 ) {
 }

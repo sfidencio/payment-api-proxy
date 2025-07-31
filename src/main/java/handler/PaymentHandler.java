@@ -2,40 +2,57 @@ package handler;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import config.Environment;
+import config.HttpResponseUtililty;
+import dto.PaymentRequest;
+import org.json.JSONObject;
 import service.PaymentService;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.logging.Logger;
 
-import static config.Constants.MSG_PROCESS_POST_REQUEST;
+import static config.Constants.*;
 
 public class PaymentHandler implements HttpHandler {
-   static final Logger logger = Logger.getLogger(PaymentHandler.class.getName());
+    private static final Logger logger = Logger.getLogger(PaymentHandler.class.getName());
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if (VerbHttp.isValid(exchange.getRequestMethod()) && exchange.getRequestMethod().equals(VerbHttp.POST.name()))
+        if (HttpVerb.isValid(exchange.getRequestMethod()) &&
+                exchange.getRequestMethod().equals(HttpVerb.POST.name())) {
             this.processPost(exchange);
+        } else {
+            exchange.sendResponseHeaders(405, -1);
+        }
     }
 
     private void processPost(HttpExchange exchange) throws IOException {
+        Environment
+                .processLogging(logger, MSG_PROCESS_POST_REQUEST.concat(" - ").concat(exchange.getRequestURI().toString()));
+        try (InputStream is = exchange.getRequestBody()) {
+            String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            var requestJson = new JSONObject(body);
+            var request = new PaymentRequest(
+                    requestJson.getString(CORRELATION_ID),
+                    requestJson.getBigDecimal(AMOUNT)
+            );
 
-        logger.info(MSG_PROCESS_POST_REQUEST);
-        InputStream is = exchange.getRequestBody();
-        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        String response = PaymentService.process(body);
+            Environment
+                    .processLogging(logger, MSG_PROCESS_POST_REQUEST.concat(" - ").concat(request.toString()));
 
-        byte[] responseBytes = Objects.requireNonNull(response).getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, responseBytes.length);
+            if (!PaymentService.processPayment(request)) {
+                HttpResponseUtililty.sendJson(exchange, 502, MSG_PAYMENT_FAILED);
+                return;
+            }
 
-        OutputStream os = exchange.getResponseBody();
-        os.write(responseBytes);
-        os.close();
-
+            HttpResponseUtililty.sendJson(exchange, 200, Objects.requireNonNull(MSG_PAYMENT_SUCCESS));
+        } catch (Exception e) {
+            Environment
+                    .processLogging(logger, MSG_UNEXPECTED_ERROR.concat(" - ").concat(e.getMessage()));
+            HttpResponseUtililty.sendJson(exchange, 500, MSG_INTERNAL_SERVER_ERROR);
+        }
     }
 }

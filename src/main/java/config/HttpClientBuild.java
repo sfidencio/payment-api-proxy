@@ -1,10 +1,11 @@
 package config;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 
-public class HttpClientHelper {
+public class HttpClientBuild {
 
-    private HttpClientHelper() {
+    private HttpClientBuild() {
         throw new IllegalStateException("Utility class");
     }
 
@@ -24,6 +25,7 @@ public class HttpClientHelper {
     private static class Holder {
         private static final HttpClient INSTANCE = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_2)
+                .connectTimeout(Duration.ofSeconds(3))
                 .build();
     }
 }

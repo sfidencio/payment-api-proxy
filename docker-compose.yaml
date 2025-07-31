@@ -1,0 +1,90 @@
+# This file is part of the payment API proxy project.
+# 'nodeX', 'nodeY', representing the payment API proxy nodes, are designed to handle requests and route them to the appropriate payment processor.
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    command: ["nginx", "-g", "daemon off;"]
+    depends_on:
+      - node1
+      - node2
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 30MB
+
+  node1: &node-pointer
+    hostname: node1
+    image: sfidencio/payment-api-proxy:latest
+    container_name: node1
+    environment:
+      - APP_PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PROCESSOR_DEFAULT=http://payment-processor-default:8080
+      - PROCESSOR_FALLBACK=http://payment-processor-fallback:8080
+      - ENABLE_LOGGING=true
+    networks:
+      - backend
+      - payment-processor
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    oom_score_adj:
+        -1000
+    sysctls:
+      net.core.somaxconn: 1024
+      net.ipv4.tcp_tw_reuse: 1
+    ports:
+      - "8081:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 64MB
+
+  node2:
+    <<: *node-pointer
+    hostname: node2
+    container_name: node2
+    ports:
+      - "8082:8080"
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --save "" --appendonly no --maxclients 20000 --maxmemory 192mb
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192MB
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+
+networks:
+  backend:
+    driver: bridge
+  payment-processor:
+    external: true

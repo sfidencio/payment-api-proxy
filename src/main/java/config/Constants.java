@@ -7,24 +7,46 @@ public class Constants {
     }
 
     public static final String MSG_INSTANCE = "DynamicThreadPool cannot be instantiated";
-    public static final String MSG_GATEWAY_PROCESSED_SUCCESSFULY = "Default gateway processed successfully.";
-    public static final String MSG_CORRELATION_ID = "correlationId";
+    public static final String MSG_PAYMENT_SUCCESS = "Payment processed successfully.";
+    public static final String MSG_PAYMENT_FAILED = "Payment processing failed.";
+    public static final String MSG_INTERNAL_SERVER_ERROR = "Internal server error.";
+    public static final String MSG_UNEXPECTED_ERROR = "Unexpected error occurred while processing payment: ";
+
+    public static final String MSG_PAYMENT_FAILED_DEFAULT_AND_FALLBACK_GATEWAY = "Payment failed with both primary and fallback gateways.";
+
+    public static final String CORRELATION_ID = "correlationId";
+    public static final String AMOUNT = "amount";
+    public static final String REQUESTED_AT = "requestedAt";
+    public static final String MSG_RESPONSE_PAYMENT = "message";
+
+    public static final String MSG_INVALID_QUERY_PARAMS = "Invalid query parameters. Please provide 'from' and 'to' parameters in the format: ?from=YYYY-MM-DD&to=YYYY-MM-DD";
     public static final String MSG_PROCESS_POST_REQUEST = "Processing POST request";
+    public static final String MSG_PROCESS_GET_REQUEST = "Processing GET request";
     public static final String MSG_PROCESS_HEALTH_KEY = "payment-processor";
     public static final String MSG_PROCESS_HEALTH_FALLBACK_KEY = "payment-processor-fallback";
-    public static final String MSG_PROCESS_HEALTH_URL = "http://payment-processor/health";
-    public static final String MSG_PROCESS_HEALTH_FALLBACK_URL = "http://payment-processor-fallback/health";
+
+    public static final String MSG_GATEWAY_HEALTH_MINRESPONSE_TIME = "minResponseTime";
+    public static final String MSG_GATEWAY_HEALTH_FAILING = "failing";
+
+    public static final String PROCESSOR_DEFAULT = "PROCESSOR_DEFAULT";
+    public static final String PROCESSOR_FALLBACK = "PROCESSOR_FALLBACK";
+
+    public static final String REDIS_HOST = "REDIS_HOST";
+    public static final String REDIS_PORT = "REDIS_PORT";
 
 
-    public static final String MSG_GATEWAY_FIELD_REDIS = "gateway";
-    public static final String MSG_AMOUNT_FIELD_REDIS = "amount";
-    public static final String MSG_TIMESTAMP_FIELD_REDIS = "timestamp";
-    public static final String MSG_FEE_REDIS = "fee";
+    public static final String PROCESSOR_GATEWAY_SELECTED = "selectedGateway";
+    public static final String PROCESSOR_GATEWAY_SELECTED_FALLBACK = "fallback";
+    public static final String PROCESSOR_GATEWAY_SELECTED_DEFAULT = "default";
 
-    public static final String DEFAULT_GATEWAY_URL = "https://payment-processor/payments";
-    public static final String FALLBACK_GATEWAY_URL = "https://payment-processor-fallback/payments";
+    public static final String ENABLE_LOGGING = "ENABLE_LOGGING";
 
-    public static final String MSG_DEFAULT_GATEWAY_FAILED = "Default gateway failed: ";
+    public static final String PROCESSOR_POST_PAYMENT_URI = "/payments";
+    public static final String PROCESSOR_GET_PAYMENT_URI = "/payments-summary";
+    public static final String PROCESSOR_URI_HEALTH = "/service-health";
+    public static final String APP_PORT = "APP_PORT";
 
-    public static final String MSG_PROCESSING_PAYMENT_PAYLOAD = "Processing payment with payload: ";
+    //MSG_NO_RECORDS_FOUND
+    public static final String MSG_NO_RECORDS_FOUND = "No records found for the given date range.";
 }
+

@@ -37,8 +37,8 @@ Essa abordagem é indicada para soluções onde cada milissegundo conta, como si
 - Atualmente faz o parsing do valor do pagamento do corpo da requisição.
 - Estrutura pronta para integração com gateways de pagamento.
 
-### Verb.java
-- Enum para os verbos HTTP suportados.
+### HttpVerb.java
+- Enum para os Verbos HTTP suportados.
 - Método utilitário para validar métodos HTTP.
 
 ### GatewayHealth.java
@@ -61,14 +61,38 @@ Content-Type: application/json
 }
 ```
 
-## Exemplos de chamada com curl 🖥��
+
+## Executando a aplicação com Docker 🐳 sem docker-compose
 
 ```bash
-curl -X POST http://localhost:8080/payment \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 100.0}'
+docker build -t sfidencio/payment-api-proxy:latest .
+docker run --name payment-api-proxy --rm -p 8080:8080 sfidencio/payment-api-proxy:latest
+```
 
-curl -X POST http://localhost:8080/payment \
+## Parando a aplicação
+```bash
+docker stop payment-api-proxy
+```
+
+
+## Executando o processador de pagamentos(proposto pela rinha) com Docker Compose 🐳
+
+```bash
+docker compose -f docker-compose-processor.yaml up --build -d
+```
+
+## Executando o backend payment-api-proxy com Docker Compose 🐳
+
+```bash
+docker compose -f docker-compose.yaml up --build -d
+```
+
+
+## Exemplos de chamada `POST` com curl
+
+```bash
+curl -v -X POST http://localhost:8080/payments   \ 
   -H "Content-Type: application/json" \
-  -d '{"amount": 250.5}'
+  -d '{"correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3", "amount": 100.0}'
+
 ```

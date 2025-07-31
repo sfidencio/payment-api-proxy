@@ -1,101 +1,125 @@
 package service;
 
-import config.HttpClientHelper;
-import config.RedisClientHelper;
-import org.json.JSONObject;
+import config.Environment;
+import config.PaymentDependencies;
+import dto.PaymentRequest;
+import dto.PaymentSummaryByGatewayResponse;
 
-import java.net.URI;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
-import static config.Constants.*;
+import static config.Constants.MSG_INSTANCE;
+import static config.Constants.MSG_PAYMENT_FAILED_DEFAULT_AND_FALLBACK_GATEWAY;
 
 public class PaymentService {
 
-
-    private static final AtomicBoolean processorDefaultGatewayActive = new AtomicBoolean(true);
-    private static final AtomicBoolean processorFallbackGatewayActive = new AtomicBoolean(true);
     private static final Logger logger = Logger.getLogger(PaymentService.class.getName());
-
 
     private PaymentService() {
         throw new IllegalStateException(MSG_INSTANCE);
     }
 
-    public static String process(String payload) {
-        logger.info(MSG_PROCESSING_PAYMENT_PAYLOAD.concat(payload));
+    public static boolean processPayment(PaymentRequest request) {
+        var paymentGateway = PaymentDependencies.getInstance().getPaymentProcess();
+        var paymentRepository = PaymentDependencies.getInstance().getRepository();
 
-        var requestGateway = createRequest(DEFAULT_GATEWAY_URL, payload);
+        paymentGateway.setContingency(false);
 
-        if (processorDefaultGatewayActive.get()) {
-            try {
-                var response = HttpClientHelper.getInstance().send(requestGateway, HttpResponse.BodyHandlers.ofString());
+        boolean fallbackTried = false;
+        int lastStatusCode = 0;
+        try {
 
-                if (response.statusCode() == 200) {
-                    logger.info(MSG_GATEWAY_PROCESSED_SUCCESSFULY);
+            if (paymentRepository.getByCorrelationId(request.getCorrelationId())) {
+                Environment.processLogging(logger, "Record already exists in the database. Gateway: ".concat(" Data: ").concat(request.toString()));
+                return false;
+            }
+
+            var response = paymentGateway.process(request);
+            lastStatusCode = response != null ? response.statusCode() : 0;
+            if (lastStatusCode == 200) {
+                paymentRepository.save(
+                        request.getCorrelationId(),
+                        response.gatewayType(),
+                        request.getAmount(),
+                        request.getRequestAt()
+                );
+                return true;
+            }
 
 
-                    var jsonRedis = buildResponse(
-                            new JSONObject(
-                                    response.body()
-                            ),
-                            DEFAULT_GATEWAY_URL,
-                            Instant.now(),
-                            5);
+            if (lastStatusCode == 422) {
+                Environment.processLogging(logger, "Record already exists in the database. Gateway: " + response.gatewayType());
+                return false;
+            }
 
-                    RedisClientHelper.getInstance().set(jsonRedis.getString(MSG_CORRELATION_ID), jsonRedis.toString());
+            paymentGateway.setContingency(true);
+            fallbackTried = true;
+            response = paymentGateway.process(request);
+            lastStatusCode = response != null ? response.statusCode() : 0;
+            if (lastStatusCode == 200) {
+                paymentRepository.save(
+                        request.getCorrelationId(),
+                        response.gatewayType(),
+                        request.getAmount(),
+                        request.getRequestAt()
+                );
+                return true;
+            }
 
-                    return response.body();
+            if (lastStatusCode == 422) {
+                Environment.processLogging(logger, "Record already exists in the database. Gateway: " + response.gatewayType());
+                return false;
+            }
+
+            Environment
+                    .processLogging(logger,
+                            MSG_PAYMENT_FAILED_DEFAULT_AND_FALLBACK_GATEWAY
+                    );
+            return false;
+        } catch (Exception ex) {
+            if (!fallbackTried && ((lastStatusCode != 200 && lastStatusCode != 422))) {
+                try {
+                    paymentGateway.setContingency(true);
+                    var response = paymentGateway.process(request);
+                    int status = response != null ? response.statusCode() : 0;
+                    if (status == 200) {
+                        paymentRepository.save(
+                                request.getCorrelationId(),
+                                response.gatewayType(),
+                                request.getAmount(),
+                                request.getRequestAt()
+                        );
+                        return true;
+                    }
+                    if (status == 422) {
+                        Environment.processLogging(logger, "Record already exists in the database. Gateway: " + response.gatewayType());
+                        return false;
+                    }
+                    Environment.processLogging(logger, MSG_PAYMENT_FAILED_DEFAULT_AND_FALLBACK_GATEWAY);
+                } catch (Exception e) {
+                    Environment
+                            .processLogging(
+                                    logger,
+                                    MSG_PAYMENT_FAILED_DEFAULT_AND_FALLBACK_GATEWAY.concat(" Default: ").concat(ex.getMessage()).concat(", Fallback: ").concat(e.getMessage())
+                            );
                 }
-            } catch (Exception e) {
-                processorDefaultGatewayActive.set(false);
-                logger.warning(MSG_DEFAULT_GATEWAY_FAILED.concat(e.getMessage()));
             }
         }
+        return false;
+    }
 
-        var requestFallback = createRequest(FALLBACK_GATEWAY_URL, payload);
-        if (processorFallbackGatewayActive.get()) {
-            try {
-                var response = HttpClientHelper.getInstance().send(requestFallback, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 200) {
-                    logger.info(MSG_GATEWAY_PROCESSED_SUCCESSFULY);
-                    var input = new JSONObject(response.body());
-                    UUID correlationId = UUID.fromString(input.getString(MSG_CORRELATION_ID));
-                    RedisClientHelper.getInstance().set(correlationId.toString(), response.body());
-                    return response.body();
-                }
-            } catch (Exception e) {
-                processorDefaultGatewayActive.set(false);
-                logger.warning(MSG_DEFAULT_GATEWAY_FAILED.concat(e.getMessage()));
-            }
+    public static PaymentSummaryByGatewayResponse getPaymentSummary(Instant from, Instant to) {
+        var paymentRepository = PaymentDependencies.getInstance().getRepository();
+
+        var paymentSummary = paymentRepository.get(from, to);
+
+        if (paymentSummary == null || paymentSummary.paymentSummaryByGateway().isEmpty()) {
+            Environment.processLogging(logger, "No records found for the given date range.");
+            return null;
         }
 
-        return null;
+        Environment.processLogging(logger, "Payment summary retrieved successfully.");
+
+        return paymentSummary;
     }
-
-    public static HttpRequest createRequest(String url, String body) {
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
-    }
-
-    private static JSONObject buildResponse(JSONObject jsonObject,
-                                            String gateway,
-                                            Instant timestamp,
-                                            double fee) {
-        JSONObject response = new JSONObject();
-        response.put(MSG_CORRELATION_ID, jsonObject.get(MSG_CORRELATION_ID));
-        response.put(MSG_GATEWAY_FIELD_REDIS, gateway);
-        response.put(MSG_AMOUNT_FIELD_REDIS, jsonObject.get(MSG_AMOUNT_FIELD_REDIS));
-        response.put(MSG_TIMESTAMP_FIELD_REDIS, fee);
-
-        return response;
-    }
-
 }
