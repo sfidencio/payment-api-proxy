@@ -48,5 +48,7 @@ public class Constants {
 
     //MSG_NO_RECORDS_FOUND
     public static final String MSG_NO_RECORDS_FOUND = "No records found for the given date range.";
+
+    public static final String ENABLE_LOG_GLOBAL = "ENABLE_LOG_GLOBAL";
 }
 

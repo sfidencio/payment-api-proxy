@@ -2,6 +2,7 @@ package service;
 
 import config.Environment;
 import config.PaymentDependencies;
+import dto.PaymentProcessorResponse;
 import dto.PaymentRequest;
 import dto.PaymentSummaryByGatewayResponse;
 
@@ -35,6 +36,11 @@ public class PaymentService {
             }
 
             var response = paymentGateway.process(request);
+//            var response = new PaymentProcessorResponse(
+//                    "Payment processed successfully",
+//                    "DefaultGateway",
+//                    200
+//            );
             lastStatusCode = response != null ? response.statusCode() : 0;
             if (lastStatusCode == 200) {
                 paymentRepository.save(

@@ -14,7 +14,7 @@ public class DynamicThreadPool {
         ThreadFactory threadFactory = Thread.ofVirtual().factory();
         return new ThreadPoolExecutor(
                 0,
-                Integer.MAX_VALUE,
+                30,
                 60L,
                 TimeUnit.SECONDS,
                 new SynchronousQueue<>(),
@@ -25,6 +25,6 @@ public class DynamicThreadPool {
 
     public static ScheduledExecutorService createScheduler() {
         ThreadFactory threadFactory = Thread.ofVirtual().factory();
-        return Executors.newScheduledThreadPool(10, threadFactory);
+        return Executors.newScheduledThreadPool(2, threadFactory);
     }
 }

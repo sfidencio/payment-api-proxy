@@ -24,8 +24,8 @@ public class HttpClientBuild {
      */
     private static class Holder {
         private static final HttpClient INSTANCE = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(Duration.ofSeconds(3))
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(1))
                 .build();
     }
 }

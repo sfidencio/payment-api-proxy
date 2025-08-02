@@ -33,7 +33,6 @@ public class PaymentProcessImpl implements IPaymentProcess {
                 Objects.requireNonNull(gatewaySelected).get(PROCESSOR_GATEWAY_SELECTED).uri(),
                 paymentRequest
         );
-
         var responseGateway = HttpClientBuild.getInstance().send(requestGateway, HttpResponse.BodyHandlers.ofString());
 
         Environment.processLogging(logger, "HTTP_STATUS: ".concat(String.valueOf(responseGateway.statusCode()).concat("- Gateway ->  ").concat(gatewaySelected.get(PROCESSOR_GATEWAY_SELECTED).uri().concat(" Body: ").concat(responseGateway.body()))));

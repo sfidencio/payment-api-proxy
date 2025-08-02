@@ -12,6 +12,8 @@ import service.HealthCheckService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Instant;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static config.Constants.*;
@@ -23,6 +25,10 @@ public class Application {
 
 
     public static void main(String[] args) throws IOException {
+        if (Environment.getEnv(ENABLE_LOG_GLOBAL).equals("true"))
+            configureGlobalLogging();
+
+
         Instant start = Instant.now();
 
         var msgSensorRedis = RedisClientBuild.getInstance().ping();
@@ -56,5 +62,16 @@ public class Application {
         server.createContext(PROCESSOR_POST_PAYMENT_URI, new PaymentHandler());
         server.setExecutor(DynamicThreadPool.createExecutor());
         server.start();
+    }
+
+    public static void configureGlobalLogging() {
+        Logger rootLogger = Logger.getLogger("");
+        rootLogger.setLevel(Level.FINEST);
+        for (var handler : rootLogger.getHandlers()) {
+            handler.setLevel(Level.FINEST);
+        }
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        consoleHandler.setLevel(Level.FINEST);
+        rootLogger.addHandler(consoleHandler);
     }
 }

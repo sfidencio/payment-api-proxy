@@ -29,12 +29,12 @@ public class HealthCheckService {
         throw new IllegalStateException(MSG_INSTANCE);
     }
 
-    private static final Map<String, GatewayHealth> cache = new ConcurrentHashMap<>();
+    private static final Map<String, GatewayHealth> cache = new ConcurrentHashMap<>(2);
 
     public static void start() {
         ScheduledExecutorService scheduler = createScheduler();
-        scheduler.scheduleAtFixedRate(() -> check(MSG_PROCESS_HEALTH_KEY, Environment.getEnv(PROCESSOR_DEFAULT).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH)), 10, 10, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(() -> check(MSG_PROCESS_HEALTH_FALLBACK_KEY, Environment.getEnv(PROCESSOR_FALLBACK).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH)), 10, 10, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> check(MSG_PROCESS_HEALTH_KEY, Environment.getEnv(PROCESSOR_DEFAULT).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH)), 3, 7, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> check(MSG_PROCESS_HEALTH_FALLBACK_KEY, Environment.getEnv(PROCESSOR_FALLBACK).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH)), 3, 7, TimeUnit.SECONDS);
     }
 
     private static void check(String key, String url) {

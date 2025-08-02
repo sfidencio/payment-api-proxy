@@ -10,7 +10,7 @@ fi
 # 3. Log in to Docker Hub (replace USERNAME with your user)
 docker login -u sfidencio
 
-# 4. Check if the login was successful
+## 4. Check if the login was successful
 if [ $? -ne 0 ]; then
     echo "Error logging in to Docker Hub. Check your credentials."
     exit 1
@@ -27,7 +27,7 @@ fi
 
 # 7. Push the image to Docker Hub
 docker push sfidencio/payment-api-proxy:latest
-# 8. Check if the push was successful
+## 8. Check if the push was successful
 if [ $? -ne 0 ]; then
     echo "Error pushing the image to Docker Hub. Check your connection."
     exit 1

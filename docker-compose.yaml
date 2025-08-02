@@ -31,7 +31,8 @@ services:
       - REDIS_PORT=6379
       - PROCESSOR_DEFAULT=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK=http://payment-processor-fallback:8080
-      - ENABLE_LOGGING=true
+      - ENABLE_LOGGING=false
+      - ENABLE_LOG_GLOBAL=false
     networks:
       - backend
       - payment-processor
@@ -63,7 +64,7 @@ services:
       - "8082:8080"
 
   redis:
-    image: redis:latest
+    image: redis:alpine
     container_name: redis
     command: redis-server --save "" --appendonly no --maxclients 20000 --maxmemory 192mb
     ports:

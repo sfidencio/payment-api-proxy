@@ -13,10 +13,12 @@ public class RedisClientBuild {
 
     static {
         var config = new JedisPoolConfig();
-        config.setMaxTotal(30);
-        config.setMaxIdle(10);
-        config.setMinIdle(2);
-        config.setTestOnBorrow(true);
+        config.setMaxTotal(10);
+        config.setMaxIdle(2);
+        config.setMinIdle(1);
+        config.setTestOnBorrow(false);
+        config.setTestOnReturn(false);
+        config.setTestWhileIdle(false);
 
         var host = Environment.getEnv(REDIS_HOST);
         var port = Integer.parseInt(Environment.getEnv(REDIS_PORT));

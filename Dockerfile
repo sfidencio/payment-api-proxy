@@ -10,9 +10,13 @@ RUN native-image \
     -H:Name=payment-api-proxy-runner \
     -H:ReflectionConfigurationFiles=src/main/resources/META-INF/native-image/reflect-config.json \
     -H:+ReportUnsupportedElementsAtRuntime \
+    -H:+UseSerialGC \
     --enable-http \
     --enable-https \
-    --enable-all-security-services
+    --enable-all-security-services \
+    --gc=serial \
+    -R:MaxHeapSize=32m \
+    -R:MaxNewSize=16m
 
 FROM debian:bookworm-slim
 
