@@ -1,31 +1,58 @@
 package config;
 
-import repository.PaymentRepository;
-import repository.impl.RedisPaymentRepository;
+import io.vertx.core.Vertx;
+import repository.IHealthCheckRepository;
+import repository.IPaymentRepository;
+import repository.impl.HealthCheckRepositoryImpl;
+import repository.impl.PaymentRepositoryImpl;
+import service.IPaymentService;
+import service.PaymentServiceImpl;
 import service.processor.IPaymentProcess;
 import service.processor.impl.PaymentProcessImpl;
 
 public class PaymentDependencies {
 
-    private static final PaymentDependencies INSTANCE = new PaymentDependencies();
+    private static PaymentDependencies instance;
 
     private final IPaymentProcess paymentProcess;
-    private final PaymentRepository repository;
+    private final IPaymentService paymentService;
+    private final IPaymentRepository paymentRepository;
+    private final IHealthCheckRepository redisHealthCheckRepository;
 
-    private PaymentDependencies() {
-        this.paymentProcess = new PaymentProcessImpl();
-        this.repository = new RedisPaymentRepository();
+    private PaymentDependencies(Vertx vertx) {
+        this.paymentRepository = new PaymentRepositoryImpl(vertx);
+        this.redisHealthCheckRepository = new HealthCheckRepositoryImpl(vertx);
+        this.paymentProcess = new PaymentProcessImpl(vertx);
+        this.paymentService = new PaymentServiceImpl(vertx, paymentRepository, paymentProcess);
+    }
+
+
+    public static synchronized void initialize(Vertx vertx) {
+        if (instance == null) {
+            instance = new PaymentDependencies(vertx);
+        }
     }
 
     public static PaymentDependencies getInstance() {
-        return INSTANCE;
+        if (instance == null) {
+            throw new IllegalStateException("PaymentDependencies not initialized. Call initialize(Vertx) first.");
+        }
+        return instance;
     }
 
-    public IPaymentProcess getPaymentProcess() {
-        return paymentProcess;
+    public static IPaymentProcess getPaymentProcess() {
+        return getInstance().paymentProcess;
     }
 
-    public PaymentRepository getRepository() {
-        return repository;
+    public static IPaymentRepository getPaymentRepository() {
+        return getInstance().paymentRepository;
+    }
+
+    public static IHealthCheckRepository getRedisHealthCheckRepository() {
+        return getInstance().redisHealthCheckRepository;
+    }
+
+    public static IPaymentService getPaymentService() {
+        return getInstance().paymentService;
     }
 }

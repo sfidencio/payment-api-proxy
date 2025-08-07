@@ -19,14 +19,12 @@ public class Constants {
     public static final String REQUESTED_AT = "requestedAt";
     public static final String MSG_RESPONSE_PAYMENT = "message";
 
-    public static final String MSG_INVALID_QUERY_PARAMS = "Invalid query parameters. Please provide 'from' and 'to' parameters in the format: ?from=YYYY-MM-DD&to=YYYY-MM-DD";
-    public static final String MSG_PROCESS_POST_REQUEST = "Processing POST request";
-    public static final String MSG_PROCESS_GET_REQUEST = "Processing GET request";
     public static final String MSG_PROCESS_HEALTH_KEY = "payment-processor";
     public static final String MSG_PROCESS_HEALTH_FALLBACK_KEY = "payment-processor-fallback";
 
     public static final String MSG_GATEWAY_HEALTH_MINRESPONSE_TIME = "minResponseTime";
     public static final String MSG_GATEWAY_HEALTH_FAILING = "failing";
+    public static final String MSG_GATEWAY_LAST_HEALTH_CHECK = "lastChecked";
 
     public static final String PROCESSOR_DEFAULT = "PROCESSOR_DEFAULT";
     public static final String PROCESSOR_FALLBACK = "PROCESSOR_FALLBACK";
@@ -42,6 +40,7 @@ public class Constants {
     public static final String ENABLE_LOGGING = "ENABLE_LOGGING";
 
     public static final String PROCESSOR_POST_PAYMENT_URI = "/payments";
+    public static final String PROCESSOR_GET_PAYMENT_MONITORING_URI = "/monitoring";
     public static final String PROCESSOR_GET_PAYMENT_URI = "/payments-summary";
     public static final String PROCESSOR_URI_HEALTH = "/service-health";
     public static final String APP_PORT = "APP_PORT";
@@ -49,6 +48,10 @@ public class Constants {
     //MSG_NO_RECORDS_FOUND
     public static final String MSG_NO_RECORDS_FOUND = "No records found for the given date range.";
 
-    public static final String ENABLE_LOG_GLOBAL = "ENABLE_LOG_GLOBAL";
+    public static final String ENABLE_CONFIG_LOG = "ENABLE_CONFIG_LOG";
+
+    public static final String REDIS_MAX_TOTAL = "REDIS_MAX_TOTAL";
+    public static final String HTTP_CLIENT_CONNECT_TIMEOUT = "HTTP_CLIENT_CONNECT_TIMEOUT";
+
 }
 

@@ -40,5 +40,23 @@
   {
     "name": "org.apache.commons.pool2.impl.DefaultEvictionPolicy",
     "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.vertx.core.http.HttpVersion",
+    "allDeclaredFields": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.vertx.core.http.impl.HttpClientImpl",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.vertx.core.net.impl.SocketAddressImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.vertx.ext.web.client.impl.WebClientBase",
+    "allDeclaredConstructors": true
   }
 ]

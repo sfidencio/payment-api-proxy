@@ -1,58 +1,69 @@
 package handler;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import config.Environment;
-import config.HttpResponseUtililty;
 import dto.PaymentRequest;
-import org.json.JSONObject;
-import service.PaymentService;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
+import service.IPaymentService;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Objects;
+import java.math.BigDecimal;
 import java.util.logging.Logger;
 
-import static config.Constants.*;
-
-public class PaymentHandler implements HttpHandler {
+public class PaymentHandler implements io.vertx.core.Handler<RoutingContext> {
     private static final Logger logger = Logger.getLogger(PaymentHandler.class.getName());
 
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        if (HttpVerb.isValid(exchange.getRequestMethod()) &&
-                exchange.getRequestMethod().equals(HttpVerb.POST.name())) {
-            this.processPost(exchange);
-        } else {
-            exchange.sendResponseHeaders(405, -1);
-        }
+    private final IPaymentService paymentService;
+
+    public PaymentHandler(IPaymentService paymentService) {
+        this.paymentService = paymentService;
     }
 
-    private void processPost(HttpExchange exchange) throws IOException {
-        Environment
-                .processLogging(logger, MSG_PROCESS_POST_REQUEST.concat(" - ").concat(exchange.getRequestURI().toString()));
-        try (InputStream is = exchange.getRequestBody()) {
-            String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            var requestJson = new JSONObject(body);
-            var request = new PaymentRequest(
-                    requestJson.getString(CORRELATION_ID),
-                    requestJson.getBigDecimal(AMOUNT)
-            );
+    @Override
+    public void handle(RoutingContext ctx) {
+        Environment.processLogging(
+                logger,
+                "Received payment processing request"
+        );
+        ctx.request().body().onComplete(ar -> {
+            if (ar.succeeded()) {
+                try {
+                    var json = new JsonObject(ar.result().toString());
+                    var request = new PaymentRequest(
+                            json.getString("correlationId"),
+                            BigDecimal.valueOf(json.getDouble("amount")).movePointRight(2).longValue()
+                    );
+                    this.paymentService.process(request)
+                            .onSuccess(success -> {
+                                ctx.response()
+                                        .setStatusCode(success ? 200 : 502)
+                                        .end(success ? "Payment processed successfully" : "Payment processing failed");
+                            }).onFailure(
+                                    throwable -> {
+                                        ctx.response()
+                                                .setStatusCode(502)
+                                                .end("Payment processing failed: " + throwable.getMessage());
+                                        Environment.processLogging(
+                                                logger,
+                                                "Failed to process payment request: " + throwable.getMessage()
+                                        );
+                                    }
+                            );
 
-            Environment
-                    .processLogging(logger, MSG_PROCESS_POST_REQUEST.concat(" - ").concat(request.toString()));
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(400).end("Invalid request body");
+                    Environment.processLogging(
+                            logger,
+                            "Failed to process payment request: " + e.getMessage()
+                    );
+                }
 
-            if (!PaymentService.processPayment(request)) {
-                HttpResponseUtililty.sendJson(exchange, 502, MSG_PAYMENT_FAILED);
-                return;
+            } else {
+                ctx.response().setStatusCode(400).end("Invalid request body");
+                Environment.processLogging(
+                        logger,
+                        "Failed to process payment request: " + ar.cause().getMessage()
+                );
             }
-
-            HttpResponseUtililty.sendJson(exchange, 200, Objects.requireNonNull(MSG_PAYMENT_SUCCESS));
-        } catch (Exception e) {
-            Environment
-                    .processLogging(logger, MSG_UNEXPECTED_ERROR.concat(" - ").concat(e.getMessage()));
-            HttpResponseUtililty.sendJson(exchange, 500, MSG_INTERNAL_SERVER_ERROR);
-        }
+        });
     }
 }

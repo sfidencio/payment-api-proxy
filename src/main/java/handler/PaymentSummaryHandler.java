@@ -1,69 +1,58 @@
 package handler;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import config.Environment;
-import config.HttpResponseUtililty;
-import service.PaymentService;
+import io.vertx.ext.web.RoutingContext;
+import service.IPaymentService;
 
-import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
-import static config.Constants.*;
-
-public class PaymentSummaryHandler implements HttpHandler {
+public class PaymentSummaryHandler implements io.vertx.core.Handler<RoutingContext> {
     private static final Logger logger = Logger.getLogger(PaymentSummaryHandler.class.getName());
 
+    private final IPaymentService paymentService;
+
+    public PaymentSummaryHandler(IPaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
+
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        if (HttpVerb.isValid(exchange.getRequestMethod()) &&
-                exchange.getRequestMethod().equals(HttpVerb.GET.name())) {
-            this.processGet(exchange);
-        } else {
-            exchange.sendResponseHeaders(405, -1);
-        }
-    }
-
-    private void processGet(HttpExchange exchange) throws IOException {
-        Environment
-                .processLogging(logger, MSG_PROCESS_GET_REQUEST.concat(" - ").concat(exchange.getRequestURI().toString()));
-
-
-        Map<String, String> params = exchange.getRequestURI().getQuery() == null ? Map.of() : queryToMap(exchange.getRequestURI().getQuery());
-
-
-        var fromStr = params.get("from");
-        var toStr = params.get("to");
-
-
+    public void handle(RoutingContext ctx) {
+        String from = ctx.request().getParam("from");
+        String to = ctx.request().getParam("to");
         try {
-            Instant from = fromStr == null ? null : Instant.parse(fromStr);
-            Instant to = toStr == null ? null : Instant.parse(toStr);
-
-            var paymentSummaryResponse = PaymentService.getPaymentSummary(from, to);
-
-            if (paymentSummaryResponse == null || paymentSummaryResponse.paymentSummaryByGateway().isEmpty()) {
-                Environment.processLogging(logger, MSG_NO_RECORDS_FOUND);
-                HttpResponseUtililty.sendJson(exchange, 404, MSG_NO_RECORDS_FOUND);
-                return;
-            }
-            HttpResponseUtililty.sendJson(exchange, 200, paymentSummaryResponse.toJson());
+            Instant fromInstant = from == null ? null : Instant.parse(from);
+            Instant toInstant = to == null ? null : Instant.parse(to);
+            this.paymentService.getPaymentSummary(
+                            fromInstant,
+                            toInstant
+                    ).onSuccess(summary -> {
+                        if (summary == null || summary.paymentSummaryByGateway().isEmpty()) {
+                            Environment.processLogging(
+                                    logger,
+                                    "No payment records found for the date range: from " + from + " to " + to
+                            );
+                        } else {
+                            Environment.processLogging(
+                                    logger,
+                                    "Payment summary retrieved successfully for the date range: from " + from + " to " + to
+                            );
+                        }
+                        ctx.response().setStatusCode(200).end(summary.toJson());
+                    })
+                    .onFailure(throwable -> {
+                        ctx.response().setStatusCode(500).end("Internal server error");
+                        Environment.processLogging(
+                                logger,
+                                "Failed to retrieve payment summary: " + throwable.getMessage()
+                        );
+                    });
         } catch (Exception e) {
-            Environment
-                    .processLogging(logger, MSG_UNEXPECTED_ERROR.concat(" - ").concat(e.getMessage()));
-            HttpResponseUtililty.sendJson(exchange, 500, MSG_INTERNAL_SERVER_ERROR);
+            ctx.response().setStatusCode(400).end("Invalid request parameters");
+            Environment.processLogging(
+                    logger,
+                    "Failed to process payment summary request: " + e.getMessage()
+            );
         }
-    }
-
-
-    private Map<String, String> queryToMap(String query) {
-        return Arrays.stream(query.split("&"))
-                .map(s -> s.split("="))
-                .filter(arr -> arr.length == 2)
-                .collect(Collectors.toMap(a -> a[0], a -> a[1]));
     }
 }

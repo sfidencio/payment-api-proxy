@@ -33,3 +33,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "Docker image successfully created and pushed to Docker Hub."
+
+# 9. Docker compose up
+docker compose down
+docker compose up -d

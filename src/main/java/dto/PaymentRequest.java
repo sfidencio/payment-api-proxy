@@ -1,16 +1,15 @@
 package dto;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 public class PaymentRequest {
     private String correlationId;
-    private BigDecimal amount;
+    private long amountInCents;
     private Instant requestAt = Instant.now();
 
-    public PaymentRequest(String correlationId, BigDecimal amount) {
+    public PaymentRequest(String correlationId, long amountInCents) {
         this.correlationId = correlationId;
-        this.amount = amount;
+        this.amountInCents = amountInCents;
     }
 
     public Instant getRequestAt() {
@@ -21,8 +20,8 @@ public class PaymentRequest {
         this.requestAt = requestAt;
     }
 
-    public BigDecimal getAmount() {
-        return amount;
+    public long getAmountInCents() {
+        return amountInCents;
     }
 
     public String getCorrelationId() {
@@ -33,7 +32,7 @@ public class PaymentRequest {
     public String toString() {
         return "PaymentRequest{" +
                 "correlationId='" + correlationId + '\'' +
-                ", amount=" + amount +
+                ", amountInCents=" + amountInCents +
                 ", requestAt=" + requestAt +
                 '}';
     }

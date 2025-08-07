@@ -1,7 +1,7 @@
 package dto;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+
+import io.vertx.core.json.JsonObject;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,7 +15,8 @@ public record PaymentSummaryByGatewayResponse(Map<String, PaymentSummary> paymen
             summaryJson.put("totalAmount", summary.totalAmount());
             gatewaysJson.put(gateway, summaryJson);
         });
-        var gson = new GsonBuilder().serializeNulls().create();
-        return gson.toJson(gatewaysJson);
+        return new JsonObject(
+                gatewaysJson
+        ).encode();
     }
 }

@@ -6,17 +6,17 @@ COPY . .
 
 RUN native-image \
     --no-fallback \
+    --gc=serial \
     -jar target/payment-api-proxy.jar \
     -H:Name=payment-api-proxy-runner \
     -H:ReflectionConfigurationFiles=src/main/resources/META-INF/native-image/reflect-config.json \
     -H:+ReportUnsupportedElementsAtRuntime \
-    -H:+UseSerialGC \
     --enable-http \
     --enable-https \
     --enable-all-security-services \
-    --gc=serial \
-    -R:MaxHeapSize=32m \
-    -R:MaxNewSize=16m
+    -H:IncludeResources=META-INF/vertx/vertx-version.txt \
+    -R:MaxHeapSize=64m \
+    -R:MaxNewSize=24m
 
 FROM debian:bookworm-slim
 
