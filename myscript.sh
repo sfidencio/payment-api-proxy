@@ -8,7 +8,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # 3. Log in to Docker Hub (replace USERNAME with your user)
-docker login -u sfidencio
+echo "QWRtU2ViMjVAQCM=" | base64 -d | docker login -u sfidencio --password-stdin
 
 ## 4. Check if the login was successful
 if [ $? -ne 0 ]; then
@@ -35,5 +35,8 @@ fi
 echo "Docker image successfully created and pushed to Docker Hub."
 
 # 9. Docker compose up
-docker compose down
-docker compose up -d
+docker compose -f docker-compose-processor.yaml down
+docker compose -f docker-compose-processor.yaml up -d --remove-orphans
+
+docker compose -f docker-compose.yaml down
+docker compose -f docker-compose.yaml up -d --remove-orphans

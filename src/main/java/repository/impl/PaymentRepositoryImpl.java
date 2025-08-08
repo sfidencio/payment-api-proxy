@@ -48,10 +48,8 @@ public class PaymentRepositoryImpl implements IPaymentRepository {
             if (res != null && "1".equals(res.toString())) {
                 // Step 2: Add payment to ZSET
                 this.redisAPI.zadd(Arrays.asList(zsetKey, score, member))
-                        .onSuccess(r ->{
+                        .onSuccess(r -> {
                             String utcDate = DateTimeFormatter.ISO_INSTANT.format(timestamp);
-                            System.out.println("[PaymentRepositoryImpl] Inserted payment at UTC: " + utcDate +
-                                    " | gateway: " + gatewayType + " | correlationId: " + correlationId);
                             promise.complete();
                         })
                         .onFailure(promise::fail);

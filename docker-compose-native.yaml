@@ -1,15 +1,5 @@
 # This file is part of the payment API proxy project.
 # 'nodeX', 'nodeY', representing the payment API proxy nodes, are designed to handle requests and route them to the appropriate payment processor.
-#-XX:+UseZGC: GC de baixa latência.
-#-XX:MaxGCPauseMillis=1: Pausas de GC muito curtas.
-#-XX:+AlwaysPreTouch: Aloca memória antecipadamente.
-#-XX:+UseNUMA: Otimiza para múltiplos núcleos.
-#-XX:+PerfDisableSharedMem: Desabilita métricas que podem causar overhead.
-#-XX:+DisableExplicitGC: Ignora chamadas explícitas de GC.
-#-XX:+TieredCompilation: Melhora o tempo de aquecimento do JIT.
-#-XX:ActiveProcessorCount=2: Limita núcleos (ajuste conforme seu ambiente).
-#-Djava.net.preferIPv4Stack=true: Evita delays de IPv6.
-
 services:
   nginx:
     image: nginx:latest
@@ -25,11 +15,11 @@ services:
     networks:
       - backend
       - payment-processor
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.10'
-#          memory: 1024MB
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 50MB
 
   node1: &node-pointer
     hostname: node1
@@ -41,10 +31,9 @@ services:
       - REDIS_PORT=6379
       - PROCESSOR_DEFAULT=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK=http://payment-processor-fallback:8080
-      - ENABLE_LOGGING=true
+      - ENABLE_LOGGING=false
       - HTTP_CLIENT_CONNECT_TIMEOUT=5000
       - REDIS_MAX_TOTAL=500
-      - JAVAARGS=-XX:+UseZGC -Xms32m -Xmx100m -XX:MaxGCPauseMillis=1 -XX:+AlwaysPreTouch -XX:+UseNUMA -XX:+PerfDisableSharedMem -XX:+DisableExplicitGC -XX:+TieredCompilation -XX:ActiveProcessorCount=2 -Djava.net.preferIPv4Stack=true
     networks:
       - backend
       - payment-processor
@@ -62,11 +51,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.7'
-#          memory: 100MB
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
+          memory: 100MB
 
   node2:
     <<: *node-pointer
@@ -83,11 +72,11 @@ services:
     networks:
       - backend
       - payment-processor
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.10'
-#          memory: 100MB
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 100MB
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

@@ -4,8 +4,7 @@ import io.vertx.core.Vertx;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 
-import static config.Constants.HTTP_CLIENT_CONNECT_TIMEOUT;
-import static config.Constants.MSG_INSTANCE;
+import static config.Constants.*;
 
 public class WebClientProvider {
     private static volatile WebClient client;
@@ -17,7 +16,7 @@ public class WebClientProvider {
                     WebClientOptions options = new WebClientOptions()
                             .setConnectTimeout(Integer.parseInt(Environment.getEnv(HTTP_CLIENT_CONNECT_TIMEOUT)))
                             .setIdleTimeout(60)
-                            .setMaxPoolSize(20)
+                            .setMaxPoolSize(Integer.parseInt(Environment.getEnv(REDIS_MAX_TOTAL)))
                             .setKeepAlive(true)
                             .setTcpKeepAlive(true);
                             //.setUserAgent("Vert.x-WebClient");
