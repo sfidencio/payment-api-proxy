@@ -1,10 +1,8 @@
 package handler;
 
-import config.Environment;
 import dto.PaymentRequest;
-import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import service.IPaymentService;
+import service.producer.IPaymentService;
 
 import java.math.BigDecimal;
 import java.util.logging.Logger;
@@ -20,50 +18,24 @@ public class PaymentHandler implements io.vertx.core.Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext ctx) {
-        Environment.processLogging(
-                logger,
-                "Received payment processing request"
-        );
-        ctx.request().body().onComplete(ar -> {
-            if (ar.succeeded()) {
-                try {
-                    var json = new JsonObject(ar.result().toString());
-                    var request = new PaymentRequest(
-                            json.getString("correlationId"),
-                            BigDecimal.valueOf(json.getDouble("amount")).movePointRight(2).longValue()
-                    );
-                    this.paymentService.process(request)
-                            .onSuccess(success -> {
-                                ctx.response()
-                                        .setStatusCode(success ? 200 : 502)
-                                        .end(success ? "Payment processed successfully" : "Payment processing failed");
-                            }).onFailure(
-                                    throwable -> {
-                                        ctx.response()
-                                                .setStatusCode(502)
-                                                .end("Payment processing failed: " + throwable.getMessage());
-                                        Environment.processLogging(
-                                                logger,
-                                                "Failed to process payment request: " + throwable.getMessage()
-                                        );
-                                    }
-                            );
-
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(400).end("Invalid request body");
-                    Environment.processLogging(
-                            logger,
-                            "Failed to process payment request: " + e.getMessage()
-                    );
-                }
-
-            } else {
-                ctx.response().setStatusCode(400).end("Invalid request body");
-                Environment.processLogging(
-                        logger,
-                        "Failed to process payment request: " + ar.cause().getMessage()
-                );
+        try {
+            var json = ctx.body().asJsonObject();
+            var correlationId = json.getString("correlationId");
+            //var amountInCents = Long.parseLong(json.getString("amount").replace(".", ""));
+            var amountInCents = new BigDecimal(json.getString("amount"));
+            if (correlationId == null) {
+                ctx.response().setStatusCode(400).end("Missing required fields");
+                return;
             }
-        });
+            var paymentRequest = new PaymentRequest(correlationId, amountInCents);
+
+
+            this.paymentService.enqueue(paymentRequest)
+                    .onSuccess(msg -> ctx.response().setStatusCode(200).end("Enqueued with ID: " + paymentRequest.getCorrelationId()))
+                    .onFailure(err -> ctx.response().setStatusCode(500).end("Error enqueuing payment: " + err.getMessage()));
+        } catch (Exception e) {
+            ctx.response().setStatusCode(500)
+                    .end("Error processing payment: " + e.getMessage());
+        }
     }
 }

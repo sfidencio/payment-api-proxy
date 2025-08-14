@@ -1,4 +1,4 @@
-package service;
+package service.health;
 
 import config.Environment;
 import config.PaymentDependencies;
@@ -22,7 +22,7 @@ import static config.Constants.*;
 public class HealthCheckService {
 
     private static final Logger logger = Logger.getLogger(HealthCheckService.class.getName());
-    private static IHealthCheckRepository redisHealthCheckRepository;
+    private static IHealthCheckRepository repository;
     private static final Map<String, GatewayHealth> cache = new ConcurrentHashMap<>(2);
 
     private HealthCheckService() {
@@ -32,9 +32,9 @@ public class HealthCheckService {
     public static void start(Vertx vertx) {
         try {
             var webClient = WebClientProvider.getInstance(vertx);
-            redisHealthCheckRepository = PaymentDependencies.getRedisHealthCheckRepository();
+            repository = PaymentDependencies.getDatabaseHealthCheckRepository();
 
-            vertx.setPeriodic(6000, id -> {
+            vertx.setPeriodic(10000, id -> {
                 try {
                     check(webClient, MSG_PROCESS_HEALTH_KEY, Environment.getEnv(PROCESSOR_DEFAULT).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH));
                     check(webClient, MSG_PROCESS_HEALTH_FALLBACK_KEY, Environment.getEnv(PROCESSOR_FALLBACK).concat(PROCESSOR_POST_PAYMENT_URI).concat(PROCESSOR_URI_HEALTH));
@@ -64,9 +64,9 @@ public class HealthCheckService {
                                     );
                                     cache.put(key, gatewayHealth);
 
-                                    redisHealthCheckRepository.saveHealth(key, gatewayHealth)
-                                            .onSuccess(v -> Environment.processLogging(logger, "Health saved successfully"))
-                                            .onFailure(ex -> Environment.processLogging(logger, "Failed to save health: " + ex.getMessage()));
+                                    repository.saveHealth(key, gatewayHealth)
+                                            .onSuccess(v -> Environment.processLogging(logger, "Health saved successfully: " + key))
+                                            .onFailure(ex -> Environment.processLogging(logger, "Failed to save health: ".concat(" - ").concat(ex.getMessage())));
 
                                     Environment.processLogging(logger, "Gateway health check status -> [OK] - [GATEWAY] -> ".concat(key).concat(" [DATA] -> ").concat(gatewayHealth.toString()));
                                 } catch (Exception e) {
@@ -74,7 +74,7 @@ public class HealthCheckService {
                                     handleHealthCheckFailure(key, e);
                                 }
                             })
-                            .onFailure(ex ->{
+                            .onFailure(ex -> {
                                 Environment.processLogging(logger, "Health check request failed for " + key + ": " + ex.getMessage());
                                 handleHealthCheckFailure(key, ex);
                             });
@@ -89,7 +89,7 @@ public class HealthCheckService {
             GatewayHealth gatewayHealth = new GatewayHealth(true, 100000000, Instant.now());
             cache.put(key, gatewayHealth);
 
-            redisHealthCheckRepository.saveHealth(key, gatewayHealth)
+            repository.saveHealth(key, gatewayHealth)
                     .onFailure(saveEx -> Environment.processLogging(logger, "Failed to save failed health status: " + saveEx.getMessage()));
 
             Environment.processLogging(logger, "Gateway health check status -> [FAILED] - [GATEWAY] -> " + key + " [DATA] -> " + gatewayHealth + " - Exception: " + ex.getMessage());
@@ -102,7 +102,7 @@ public class HealthCheckService {
         Promise<GatewayHealth> promise = Promise.promise();
 
         try {
-            redisHealthCheckRepository.getHealth(key)
+            repository.getHealth(key)
                     .onComplete(ar -> {
                         try {
                             if (ar.succeeded()) {
@@ -133,7 +133,8 @@ public class HealthCheckService {
         return promise.future();
     }
 
-    public static Future<Map<String, GatewaySelected>> getBestGateway() {
+    public static Future<Map<String, GatewaySelected>>
+    getBestGateway() {
         Promise<Map<String, GatewaySelected>> promise = Promise.promise();
 
         get(MSG_PROCESS_HEALTH_KEY)
@@ -170,31 +171,30 @@ public class HealthCheckService {
         Promise<Boolean> promise = Promise.promise();
 
         try {
-            redisHealthCheckRepository.getHealth(key)
+            repository.getHealth(key)
                     .onComplete(ar -> {
                         try {
                             if (ar.succeeded() && ar.result() != null) {
                                 long secondsSinceLastCheck = Duration.between(ar.result().lastChecked(), Instant.now()).getSeconds();
                                 if (secondsSinceLastCheck < 6) {
                                     Environment.processLogging(logger, "Healthcheck skipped: last check was less than 6 seconds ago -> [GATEWAY] -> " + key);
-                                    promise.complete(true);
+                                    promise.tryComplete(true);
                                     return;
                                 }
                             }
-                            promise.complete(false);
+                            promise.tryComplete(false);
                         } catch (Exception e) {
                             Environment.processLogging(logger, "Error in skip check completion: " + e.getMessage());
-                            promise.complete(false); // Continue with check on error
+                            promise.tryComplete(false);
                         }
                     })
-                    // ESTE TAMBÉM FALTAVA - tratamento para falha no Redis
                     .onFailure(ex -> {
-                        Environment.processLogging(logger, "Redis error in skip check for " + key + ": " + ex.getMessage());
-                        promise.complete(false); // Continue with check on Redis error
+                        Environment.processLogging(logger, "Database error in skip check for " + key + ": " + ex.getMessage());
+                        promise.tryComplete(false);
                     });
         } catch (Exception e) {
             Environment.processLogging(logger, "Error in sholdSkipHealthCheck: " + e.getMessage());
-            promise.complete(false);
+            promise.tryComplete(false);
         }
 
         return promise.future();

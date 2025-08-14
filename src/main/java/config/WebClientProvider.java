@@ -16,7 +16,7 @@ public class WebClientProvider {
                     WebClientOptions options = new WebClientOptions()
                             .setConnectTimeout(Integer.parseInt(Environment.getEnv(HTTP_CLIENT_CONNECT_TIMEOUT)))
                             .setIdleTimeout(60)
-                            .setMaxPoolSize(Integer.parseInt(Environment.getEnv(REDIS_MAX_TOTAL)))
+                            .setMaxPoolSize(Integer.parseInt(Environment.getEnv(HTTP_CLIENT_POOL_SIZE)))
                             .setKeepAlive(true)
                             .setTcpKeepAlive(true);
                             //.setUserAgent("Vert.x-WebClient");

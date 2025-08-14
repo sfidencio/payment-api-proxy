@@ -17,6 +17,6 @@ public record PaymentSummaryByGatewayResponse(Map<String, PaymentSummary> paymen
         });
         return new JsonObject(
                 gatewaysJson
-        ).encode();
+        ).encodePrettily();
     }
 }

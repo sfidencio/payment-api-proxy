@@ -1,14 +1,17 @@
 package run;
 
+import config.DatabaseProvider;
 import config.Environment;
 import config.PaymentDependencies;
-import config.RedisClientProvider;
 import config.WebClientProvider;
+import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.ext.web.Router;
-import service.HealthCheckService;
-import service.IPaymentService;
+import io.vertx.ext.web.handler.BodyHandler;
+import service.consumer.PaymentProcessorVerticle;
+import service.health.HealthCheckService;
+import service.producer.IPaymentService;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -26,7 +29,6 @@ public class Application {
 
 
         var vertx = Vertx.vertx();
-
 
         setupGlobalExceptionHandler(vertx);
 
@@ -57,15 +59,17 @@ public class Application {
 
         Router router = Router.router(vertx);
 
-
         IPaymentService paymentService = PaymentDependencies.getInstance().getPaymentService();
 
         router.post(PROCESSOR_POST_PAYMENT_URI
-        ).handler(
-                new handler.PaymentHandler(
-                        paymentService
+                ).handler(
+                        BodyHandler.create()
                 )
-        );
+                .handler(
+                        new handler.PaymentHandler(
+                                paymentService
+                        )
+                );
 
         router.get(PROCESSOR_GET_PAYMENT_URI)
                 .handler(
@@ -74,7 +78,7 @@ public class Application {
                         )
                 );
 
-        // Configurações do servidor HTTP (entrada de requests)
+
         HttpServerOptions serverOptions = new HttpServerOptions()
                 .setTcpQuickAck(true)
                 .setTcpNoDelay(true)
@@ -86,28 +90,72 @@ public class Application {
                 .listen(
                         Integer.parseInt(Environment.getEnv(APP_PORT))
                 );
+
+        //Workers initialization - Payment Processor Verticles
+        deployPaymentProcessorVerticles(vertx);
+
     }
 
+    /**
+     * Realiza o deploy dos verticles responsáveis pelo processamento de pagamentos.
+     * <p>
+     * O número de instâncias é definido pela variável de ambiente PROCESSOR_CONSUMER_INSTANCES.
+     * Cada verticle é identificado por um nome único ("PaymentProcessorVerticle-<n>") e é
+     * implantado com uma instância isolada, permitindo processamento concorrente e escalável
+     * das mensagens de pagamento enfileiradas.
+     * <br>
+     * Caso a variável de ambiente não esteja definida, será utilizada uma instância por padrão.
+     * </p>
+     *
+     * @param vertx Instância do Vert.x utilizada para o deploy dos verticles.
+     */
+    private static void deployPaymentProcessorVerticles(Vertx vertx) {
+        int instances = Environment.getEnv(
+                PROCESSOR_CONSUMER_INSTANCES) != null ?
+                Integer.parseInt(
+                        Environment.getEnv(
+                                PROCESSOR_CONSUMER_INSTANCES
+                        )
+                ) : 1;
+
+        for (int i = 0; i < instances; i++) {
+            String consumerName = "PaymentProcessorVerticle-" + i;
+            vertx.deployVerticle(
+                    new PaymentProcessorVerticle(consumerName),
+                    new DeploymentOptions().setInstances(1)); // Cada verticle roda em sua própria instância
+
+        }
+    }
+
+    /**
+     * Configura o formato do logging global da aplicação.
+     * <p>
+     * Define o Vert.x global na classe de ambiente e ajusta o formato do SimpleFormatter
+     * do java.util.logging para exibir data, hora, nome da thread e mensagem.
+     * </p>
+     *
+     * @param vertx Instância do Vert.x utilizada para configuração global.
+     */
     public static void configureLogging(Vertx vertx) {
         Environment.vertx = vertx;
         System.setProperty("java.util.logging.SimpleFormatter.format", "%1$tF %1$tT [%3$s] %5$s%n");
     }
 
     private static void warmup(Vertx vertx) {
-        // Warm up the Redis client by establishing a connection
-        RedisClientProvider.getInstance(
-                vertx
-        ).connect().onSuccess(
-                connection -> Environment.processLogging(
+        // Warm up dbclient by establishing a connection
+        DatabaseProvider.getInstance(vertx)
+                .getConnection()
+                .onSuccess(conn -> {
+                    Environment.processLogging(
+                            logger,
+                            "Database connection status: Success"
+                    );
+                    conn.close();
+                })
+                .onFailure(throwable -> Environment.processLogging(
                         logger,
-                        "Redis Client connection status: Success"
-                )
-        ).onFailure(
-                throwable -> Environment.processLogging(
-                        logger,
-                        "Redis Client connection status: Failed - ".concat(throwable.getMessage())
-                )
-        );
+                        "Database connection status: Failed - ".concat(throwable.getMessage())
+                ));
 
         // Warm up the HTTP client by making a health check request
         var webClient = WebClientProvider.getInstance(vertx);

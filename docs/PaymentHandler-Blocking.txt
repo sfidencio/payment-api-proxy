@@ -25,7 +25,7 @@ public class PaymentHandler implements io.vertx.core.Handler<RoutingContext> {
      * @param ctx the {@link io.vertx.ext.web.RoutingContext} containing the HTTP request and response
      * @return void
      * @throws Exception if an error occurs during payment processing
-     * @see service.PaymentServiceImpl
+     * @see service.producer.PaymentServiceImpl
      */
     @Override
     public void handle(RoutingContext ctx) {
@@ -45,7 +45,7 @@ public class PaymentHandler implements io.vertx.core.Handler<RoutingContext> {
                                 json.getString("correlationId"),
                                 json.getLong("amount")
                         );
-                        boolean success = service.PaymentServiceImpl.processPayment(request);
+                        boolean success = service.producer.PaymentServiceImpl.processPayment(request);
                         promisse.complete();
                     } catch (Exception ex) {
                         Environment.processLogging(

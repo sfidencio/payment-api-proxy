@@ -1,97 +1,77 @@
 package repository.impl;
 
-import config.RedisClientProvider;
+import config.DatabaseProvider;
 import dto.GatewayHealth;
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.redis.client.Command;
-import io.vertx.redis.client.Redis;
-import io.vertx.redis.client.Request;
+import io.vertx.sqlclient.Pool;
+import io.vertx.sqlclient.Tuple;
 import repository.IHealthCheckRepository;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.logging.Logger;
 
-import static config.Constants.*;
 
 public class HealthCheckRepositoryImpl implements IHealthCheckRepository {
 
-    private final Redis redis;
+    private static final Logger logger = Logger.getLogger(HealthCheckRepositoryImpl.class.getName());
+    private final Pool pool;
 
+    /**
+     * Construtor que inicializa o cliente Redis.
+     *
+     * @param vertx Instância do Vertx.
+     */
     public HealthCheckRepositoryImpl(Vertx vertx) {
-        this.redis = RedisClientProvider.getInstance(vertx);
+        this.pool = DatabaseProvider.getInstance(vertx);
     }
 
+    /**
+     * Salva o status de health check no Redis.
+     *
+     * @param key    Chave do registro.
+     * @param health Dados de health check.
+     * @return Future indicando sucesso ou falha.
+     */
     @Override
-    public Future<Void> saveHealth(String key,
-                                   GatewayHealth health) {
-        Promise<Void> promisse = Promise.promise();
-
-        this.redis.send(Request.cmd(Command.HSET)
-                        .arg(key)
-                        .arg(MSG_GATEWAY_HEALTH_FAILING).arg(String.valueOf(health.failing()))
-                        .arg(MSG_GATEWAY_HEALTH_MINRESPONSE_TIME).arg(String.valueOf(health.minResponseTime()))
-                        .arg(MSG_GATEWAY_LAST_HEALTH_CHECK).arg(String.valueOf(health.lastChecked().toEpochMilli())),
-                res -> {
-                    if (res.succeeded()) {
-                        promisse.complete();
-                    } else {
-                        promisse.fail(res.cause());
-                    }
-                });
-        return promisse.future();
+    public Future<Void> saveHealth(String key, GatewayHealth health) {
+        var sql = "INSERT INTO gateway_health (key, failing, min_response_time, timestamp) VALUES ($1, $2, $3, $4) " +
+                "ON CONFLICT (key) DO UPDATE SET failing = $2, min_response_time = $3, timestamp = $4";
+        var offsetDateTime = health.lastChecked() != null ? health.lastChecked().atOffset(java.time.ZoneOffset.UTC) : null;
+        return this.pool.preparedQuery(sql)
+                .execute(Tuple.of(
+                        key,
+                        health.failing(),
+                        health.minResponseTime(),
+                        offsetDateTime
+                )).mapEmpty();
     }
 
+    /**
+     * Recupera o status de health check do Banco.
+     *
+     * @param key Chave do registro.
+     * @return Future com os dados de health check ou null se não encontrado.
+     */
     @Override
     public Future<GatewayHealth> getHealth(String key) {
-        Promise<GatewayHealth> promise = Promise.promise();
-
-        try {
-            redis.send(Request.cmd(Command.HGETALL).arg(key))
-                    .onSuccess(response -> {
-                        try {
-                            if (response != null && response.size() > 0) {
-
-                                Map<String, String> healthData = response.getKeys().stream()
-                                        .collect(HashMap::new,
-                                                (map, key1) -> map.put(key1, response.get(key1).toString()),
-                                                HashMap::putAll);
-
-                                // Validate required fields exist
-                                if (!healthData.containsKey(MSG_GATEWAY_HEALTH_FAILING) ||
-                                        !healthData.containsKey(MSG_GATEWAY_HEALTH_MINRESPONSE_TIME) ||
-                                        !healthData.containsKey(MSG_GATEWAY_LAST_HEALTH_CHECK)) {
-                                    promise.complete(null);
-                                    return;
-                                }
-
-                                boolean failing = Boolean.parseBoolean(healthData.get(MSG_GATEWAY_HEALTH_FAILING));
-                                long minResponseTime = Long.parseLong(healthData.get(MSG_GATEWAY_HEALTH_MINRESPONSE_TIME));
-                                Instant lastChecked = Instant.ofEpochMilli(Long.parseLong(healthData.get(MSG_GATEWAY_LAST_HEALTH_CHECK)));
-
-                                promise.complete(new GatewayHealth(failing, minResponseTime, lastChecked));
-                            } else {
-                                promise.complete(null);
+        var sql = "SELECT failing, min_response_time, timestamp FROM gateway_health WHERE key = $1";
+        return this.pool.preparedQuery(sql)
+                .execute(
+                        Tuple.of(key)
+                ).map(rowSet -> {
+                            if (rowSet.rowCount() == 0) {
+                                return null; // Não encontrado
                             }
-                        } catch (Exception e) {
-                            System.err.println("Error parsing Redis response for key " + key + ": " + e.getMessage());
-                            e.printStackTrace();
-                            promise.fail(e);
+                            var row = rowSet.iterator().next();
+                            var offsetDateTime = row.getOffsetDateTime("timestamp");
+                            Instant instant = offsetDateTime != null ? offsetDateTime.toInstant() : null;
+                            return new GatewayHealth(
+                                    row.getBoolean("failing"),
+                                    row.getLong("min_response_time"),
+                                    instant
+                            );
                         }
-                    })
-                    .onFailure(ex -> {
-                        System.err.println("Redis HGETALL failed for key " + key + ": " + ex.getMessage());
-                        ex.printStackTrace();
-                        promise.fail(ex);
-                    });
-        } catch (Exception e) {
-            System.err.println("Error in getHealth for key " + key + ": " + e.getMessage());
-            e.printStackTrace();
-            promise.fail(e);
-        }
-
-        return promise.future();
+                );
     }
 }

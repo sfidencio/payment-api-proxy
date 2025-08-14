@@ -2,7 +2,7 @@ package handler;
 
 import config.Environment;
 import io.vertx.ext.web.RoutingContext;
-import service.PaymentServiceImpl;
+import service.producer.PaymentServiceImpl;
 
 import java.time.Instant;
 import java.util.logging.Logger;

@@ -1,7 +1,9 @@
 package dto;
 
+import java.math.BigDecimal;
+
 public record PaymentSummary(
         int totalRequests,
-        double totalAmount
+        BigDecimal totalAmount
 ) {
 }

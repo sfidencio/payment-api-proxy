@@ -6,6 +6,4 @@ import io.vertx.core.Future;
 
 public interface IPaymentProcess {
     Future<PaymentProcessorResponse> process(PaymentRequest paymentRequest);
-
-    Future<Void> setContingency(boolean isFallback);
 }

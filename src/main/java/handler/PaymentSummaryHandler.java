@@ -2,7 +2,7 @@ package handler;
 
 import config.Environment;
 import io.vertx.ext.web.RoutingContext;
-import service.IPaymentService;
+import service.producer.IPaymentService;
 
 import java.time.Instant;
 import java.util.logging.Logger;
@@ -38,7 +38,11 @@ public class PaymentSummaryHandler implements io.vertx.core.Handler<RoutingConte
                                     "Payment summary retrieved successfully for the date range: from " + from + " to " + to
                             );
                         }
-                        ctx.response().setStatusCode(200).end(summary.toJson());
+
+                        ctx.response()
+                                .putHeader("Content-Type", "application/json")
+                                .end(summary.toJson());
+
                     })
                     .onFailure(throwable -> {
                         ctx.response().setStatusCode(500).end("Internal server error");

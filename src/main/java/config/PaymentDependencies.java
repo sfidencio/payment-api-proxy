@@ -5,10 +5,10 @@ import repository.IHealthCheckRepository;
 import repository.IPaymentRepository;
 import repository.impl.HealthCheckRepositoryImpl;
 import repository.impl.PaymentRepositoryImpl;
-import service.IPaymentService;
-import service.PaymentServiceImpl;
 import service.processor.IPaymentProcess;
-import service.processor.impl.PaymentProcessImpl;
+import service.processor.PaymentProcessImpl;
+import service.producer.IPaymentService;
+import service.producer.PaymentServiceImpl;
 
 public class PaymentDependencies {
 
@@ -17,11 +17,11 @@ public class PaymentDependencies {
     private final IPaymentProcess paymentProcess;
     private final IPaymentService paymentService;
     private final IPaymentRepository paymentRepository;
-    private final IHealthCheckRepository redisHealthCheckRepository;
+    private final IHealthCheckRepository databaseHealthCheckRepository;
 
     private PaymentDependencies(Vertx vertx) {
         this.paymentRepository = new PaymentRepositoryImpl(vertx);
-        this.redisHealthCheckRepository = new HealthCheckRepositoryImpl(vertx);
+        this.databaseHealthCheckRepository = new HealthCheckRepositoryImpl(vertx);
         this.paymentProcess = new PaymentProcessImpl(vertx);
         this.paymentService = new PaymentServiceImpl(vertx, paymentRepository, paymentProcess);
     }
@@ -48,8 +48,8 @@ public class PaymentDependencies {
         return getInstance().paymentRepository;
     }
 
-    public static IHealthCheckRepository getRedisHealthCheckRepository() {
-        return getInstance().redisHealthCheckRepository;
+    public static IHealthCheckRepository getDatabaseHealthCheckRepository() {
+        return getInstance().databaseHealthCheckRepository;
     }
 
     public static IPaymentService getPaymentService() {

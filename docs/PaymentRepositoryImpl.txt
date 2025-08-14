@@ -1,6 +1,9 @@
 package repository.impl;
 
+import config.Environment;
 import config.RedisClientProvider;
+import dto.PaymentMessage;
+import dto.PaymentRequest;
 import dto.PaymentSummary;
 import dto.PaymentSummaryByGatewayResponse;
 import io.vertx.core.Future;
@@ -9,18 +12,75 @@ import io.vertx.core.Vertx;
 import io.vertx.core.impl.future.CompositeFutureImpl;
 import io.vertx.redis.client.Redis;
 import io.vertx.redis.client.RedisAPI;
+import io.vertx.redis.client.Response;
+import io.vertx.redis.client.ResponseType;
 import repository.IPaymentRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
+import java.util.logging.Logger;
 
 import static config.Constants.PROCESSOR_GATEWAY_SELECTED_DEFAULT;
 import static config.Constants.PROCESSOR_GATEWAY_SELECTED_FALLBACK;
 
 
+/**
+ * Implementação do repositório de pagamentos utilizando Redis como backend.
+ * <p>
+ * Esta classe é responsável por todas as operações de persistência, consumo e confirmação de mensagens de pagamento,
+ * além de fornecer métodos para sumarização de dados de pagamentos agrupados por gateway.
+ * </p>
+ *
+ * <p>
+ * Principais responsabilidades:
+ * <ul>
+ *   <li>Gerenciar a fila de pagamentos (Redis Stream) para enfileirar, consumir e confirmar mensagens.</li>
+ *   <li>Criar e gerenciar grupos de consumidores para processamento concorrente e seguro das mensagens.</li>
+ *   <li>Persistir e recuperar informações de pagamentos processados.</li>
+ *   <li>Fornecer sumarização de pagamentos por gateway e período.</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * Funcionamento geral:
+ * <ol>
+ *   <li>Ao instanciar, garante a existência do grupo de consumidores no Redis Stream.</li>
+ *   <li>Permite enfileirar novas requisições de pagamento na fila.</li>
+ *   <li>Consome lotes de mensagens pendentes para processamento, respeitando o grupo e consumidor.</li>
+ *   <li>Confirma (acknowledge) mensagens processadas para evitar reprocessamento.</li>
+ *   <li>Permite sumarizar pagamentos processados por gateway em determinado período.</li>
+ * </ol>
+ * </p>
+ *
+ * <p>
+ * Detalhes dos principais campos:
+ * <ul>
+ *   <li><b>PAYMENT_QUEUE</b>: Nome da stream Redis utilizada como fila de pagamentos.</li>
+ *   <li><b>CONSUMER_GROUP</b>: Nome do grupo de consumidores para processamento concorrente.</li>
+ *   <li><b>CONSUMER_NAME</b>: Identificador do consumidor atual.</li>
+ *   <li><b>redisAPI</b>: Instância da API do Redis para execução dos comandos.</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * Observações:
+ * <ul>
+ *   <li>Utiliza o padrão de stream do Redis para garantir processamento escalável e seguro.</li>
+ *   <li>Mensagens só são removidas da fila após confirmação explícita (ack).</li>
+ *   <li>Falhas na criação do grupo de consumidores são tratadas como já existente.</li>
+ * </ul>
+ * </p>
+ *
+ * @author Seu Nome
+ * @since 1.0
+ */
 public class PaymentRepositoryImpl implements IPaymentRepository {
+
+    private static final String PAYMENT_QUEUE = "payments:stream";
+    private static final String CONSUMER_GROUP = "payment-consumers";
+    private static final Logger logger = Logger.getLogger(PaymentRepositoryImpl.class.getName());
 
 
     private final RedisAPI redisAPI;
@@ -28,58 +88,31 @@ public class PaymentRepositoryImpl implements IPaymentRepository {
     public PaymentRepositoryImpl(Vertx vertx) {
         Redis redisClient = RedisClientProvider.getInstance(vertx);
         this.redisAPI = RedisAPI.api(redisClient);
+        ensureConsumerGroupExists();
     }
 
-
-//    @Override
-//    public Future<Void> save(String correlationId,
-//                             String gatewayType,
-//                             long amountInCents) {
-//        String key = "payments:".concat(gatewayType);
-//        String value = String.format("%s:%s", correlationId, amountInCents);
-//        long score = Instant.now().toEpochMilli();
-//
-//        Promise<Void> promise = Promise.promise();
-//
-//        this.redisAPI.zadd(
-//                Arrays.asList(
-//                        key,
-//                        String.valueOf(score),
-//                        value
-//                )
-//        ).compose(
-//                res ->
-//                        redisAPI.hset(
-//                                Arrays.asList(
-//                                        "payments-query:index",
-//                                        correlationId,
-//                                        String.format("%s", correlationId)
-//                                )
-//                        )
-//
-//        ).onSuccess(
-//                r -> promise.complete()
-//        ).onFailure(promise::fail);
-//
-//        return promise.future();
-//    }
-
     @Override
-    public Future<Void> save(String correlationId,
-                             String gatewayType,
-                             long amountInCents,
-                             Instant timestamp) {
-        String key = "payments:".concat(gatewayType).concat(":").concat(correlationId).concat(":").concat(String.valueOf(amountInCents));
-        String value = String.valueOf(amountInCents).concat(":").concat(String.valueOf(timestamp.toEpochMilli()));
+    public Future<String> save(PaymentRequest request) {
+        Promise<String> promise = Promise.promise();
+        String correlationKey = "payments:correlationIds";
 
-        Promise<Void> promise = Promise.promise();
-
-        this.redisAPI.setnx(key, value)
+        // Try to add the correlationId to a Redis SET (returns 1 if new, 0 if already exists)
+        this.redisAPI.sadd(Arrays.asList(correlationKey, request.getCorrelationId()))
                 .onSuccess(res -> {
-                    if (res != null && "1".equals(res.toString())) {
-                        promise.complete();
+                    if ("1".equals(res.toString())) {
+                        // Not a duplicate, proceed to add to stream
+                        List<String> streamArgs = Arrays.asList(
+                                PAYMENT_QUEUE, "*",
+                                "correlationId", request.getCorrelationId(),
+                                "amountInCents", String.valueOf(request.getAmountInCents()),
+                                "timestampMs", String.valueOf(request.getRequestAt().toEpochMilli())
+                        );
+                        this.redisAPI.xadd(streamArgs)
+                                .onSuccess(r -> promise.complete(r.toString()))
+                                .onFailure(promise::fail);
                     } else {
-                        promise.fail("Duplicate correlationId for this gateway");
+                        // Duplicate found
+                        promise.fail("Duplicate correlationId: " + request.getCorrelationId());
                     }
                 })
                 .onFailure(promise::fail);
@@ -87,151 +120,173 @@ public class PaymentRepositoryImpl implements IPaymentRepository {
         return promise.future();
     }
 
+
+    public Future<String> enqueue(PaymentRequest request) {
+        Promise<String> promise = Promise.promise();
+        List<String> args = Arrays.asList(
+                PAYMENT_QUEUE, "*",
+                "correlationId", request.getCorrelationId(),
+                "amountInCents", String.valueOf(request.getAmountInCents()),
+                "timestampMs", String.valueOf(request.getRequestAt().toEpochMilli())
+        );
+
+        this.redisAPI.xadd(args)
+                .onSuccess(res -> promise.complete(res.toString()))
+                .onFailure(promise::fail);
+
+        return promise.future();
+    }
+
     @Override
-    public Future<Boolean> getByCorrelationId(String correlationId) {
-//        return this.redisAPI.hget(
-//                        "payments-query:index",
-//                        correlationId
-//                )
-//                .map(res -> res != null && res.toString().trim().equals(correlationId.trim()));
-        // SETNX returns 1 if the key was set, 0 if it already exists
-        return this.redisAPI.setnx("payments-query:index:" + correlationId, "1")
-                .map(res -> res != null && "1".equals(res.toString()));
+    public Future<Boolean> checkDuplicateCorrelationId(String correlationId) {
+        Promise<Boolean> promise = Promise.promise();
+        String correlationKey = "payments:correlationIds";
+
+        this.redisAPI.send("SISMEMBER", correlationKey, correlationId))
+                .onSuccess(res -> {
+                    // Redis SISMEMBER retorna 1 se existe, 0 se não existe
+                    boolean isDuplicate = "1".equals(res.toString());
+                    promise.complete(isDuplicate);
+                })
+                .onFailure(err -> {
+                    Environment.processLogging(logger, "Erro ao verificar duplicidade: " + err.getMessage());
+                    promise.fail(err);
+                });
+
+        return promise.future();
     }
 
 
-//    public Future<PaymentSummaryByGatewayResponse> get(Instant from, Instant to) {
-//        Promise<PaymentSummaryByGatewayResponse> promise = Promise.promise();
-//        this.redisAPI.keys("payments:*").onComplete(keysRes -> {
-//            if (keysRes.failed()) {
-//                promise.fail(keysRes.cause());
-//                return;
-//            }
-//            String[] keys = keysRes.result().stream()
-//                    .map(Object::toString)
-//                    .toArray(String[]::new);
-//            Map<String, PaymentSummary> tempMap = new LinkedHashMap<>();
-//            long fromM = from == null ? 0L : from.toEpochMilli();
-//            long toM = to == null ? Long.MAX_VALUE : to.toEpochMilli();
-//
-//            List<Future> futures = new ArrayList<>();
-//
-//            for (String key : keys) {
-//                String gateway = key.replace("payments:", "");
-//                Future<List<String>> entries = this.redisAPI.zrangebyscore(
-//                        Arrays.asList(
-//                                key,
-//                                String.valueOf(fromM),
-//                                String.valueOf(toM)
-//                        )
-//                ).map(entriesMap -> entriesMap.stream().map(Object::toString).toList());
-//
-//                futures.add(entries.onSuccess(entriesFuture -> {
-//                    long totalAmountInCents = entriesFuture.stream()
-//                            .mapToLong(entry -> Long.parseLong(entry.split(":")[1]))
-//                            .sum();
-//                    double totalFormatted = BigDecimal.valueOf(totalAmountInCents).movePointLeft(2)
-//                            .setScale(2, RoundingMode.HALF_UP).doubleValue();
-//
-//                    tempMap.put(gateway, new PaymentSummary(
-//                            entriesFuture.size(),
-//                            totalFormatted
-//                    ));
-//                }));
-//            }
-//
-//            CompositeFutureImpl.all(
-//                    futures.toArray(
-//                            new Future[0]
-//                    )
-//            ).onComplete(
-//                    ar -> {
-//                        if (ar.succeeded()) {
-//                            Map<String, PaymentSummary> summaryByGateway = new LinkedHashMap<>();
-//                            summaryByGateway.put(PROCESSOR_GATEWAY_SELECTED_DEFAULT, new PaymentSummary(0, 0.0));
-//                            summaryByGateway.put(PROCESSOR_GATEWAY_SELECTED_FALLBACK, new PaymentSummary(0, 0.0));
-//
-//                            if (tempMap.containsKey("default")) {
-//                                summaryByGateway.put("default", tempMap.get("default"));
-//                            }
-//                            tempMap.keySet().stream()
-//                                    .filter(gateway -> !gateway.equals("default"))
-//                                    .sorted()
-//                                    .forEach(gateway -> summaryByGateway.put(gateway, tempMap.get(gateway)));
-//
-//                            promise.complete(new PaymentSummaryByGatewayResponse(summaryByGateway));
-//                        } else {
-//                            promise.fail(ar.cause());
-//                        }
-//                    });
-//
-//        });
-//
-//        return promise.future();
-//    }
+    public Future<List<PaymentMessage>> consumeBatch(int count, String consumerName) {
+        Promise<List<PaymentMessage>> promise = Promise.promise();
+        List<String> args = Arrays.asList(
+                "GROUP", CONSUMER_GROUP, consumerName,
+                "COUNT", String.valueOf(count),
+                "BLOCK", "2000",
+                "STREAMS", PAYMENT_QUEUE, ">"
+        );
+
+        this.redisAPI.xreadgroup(args).onSuccess(res -> {
+            List<PaymentMessage> messages = new ArrayList<>();
+            if (res != null && res.type() == ResponseType.MULTI && res.size() > 0) {
+                for (String streamKey : res.getKeys()) {
+                    Response stream = res.get(streamKey);
+                    if (stream != null && stream.type() == ResponseType.MULTI && stream.size() > 0) {
+                        List<Response> entries = stream.stream().toList();
+                        for (Response entry : entries) {
+                            if (entry != null && entry.type() == ResponseType.MULTI && entry.size() > 1) {
+                                String messageId = entry.get(0).toString();
+                                List<Response> fields = entry.get(1).stream().toList();
+                                Map<String, String> req = new HashMap<>();
+                                for (int j = 0; j < fields.size(); j += 2) {
+                                    String key = fields.get(j).toString();
+                                    String value = fields.get(j + 1).toString();
+                                    req.put(key, value);
+                                }
+                                PaymentRequest paymentRequest = new PaymentRequest(
+                                        req.get("correlationId"),
+                                        req.get("amountInCents") != null ? Long.parseLong(req.get("amountInCents")) : 0L
+                                );
+                                paymentRequest.setRequestAt(
+                                        Instant.ofEpochMilli(Long.parseLong(req.get("timestampMs")))
+                                );
+                                messages.add(new PaymentMessage(messageId, paymentRequest));
+                            }
+                        }
+                    }
+                }
+            }
+            promise.complete(messages);
+        }).onFailure(promise::fail);
+        return promise.future();
+    }
+
+
+    public Future<Void> ack(String messageId) {
+        Promise<Void> promise = Promise.promise();
+        this.redisAPI.xack(Arrays.asList(PAYMENT_QUEUE, CONSUMER_GROUP, messageId)).onSuccess(res -> promise.complete(null))
+                .onFailure(promise::fail);
+        return promise.future();
+    }
 
     public Future<PaymentSummaryByGatewayResponse> get(Instant from, Instant to) {
         Promise<PaymentSummaryByGatewayResponse> promise = Promise.promise();
-        this.redisAPI.keys("payments:*:*").onComplete(keysRes -> {
-            if (keysRes.failed()) {
-                promise.fail(keysRes.cause());
-                return;
-            }
-            List<String> keys = keysRes.result().stream().map(Object::toString).toList();
-            Map<String, PaymentSummary> tempMap = new LinkedHashMap<>();
-            long fromM = from == null ? 0L : from.toEpochMilli();
-            long toM = to == null ? Long.MAX_VALUE : to.toEpochMilli();
+        List<String> gateways = List.of(PROCESSOR_GATEWAY_SELECTED_DEFAULT, PROCESSOR_GATEWAY_SELECTED_FALLBACK);
 
-            List<Future> futures = new ArrayList<>();
-            for (String key : keys) {
-                futures.add(this.redisAPI.get(key).map(value -> {
-                    if (value == null) return null;
-                    String[] parts = value.toString().split(":");
-                    if (parts.length != 2) return null;
-                    long amount = Long.parseLong(parts[0]);
-                    long ts = Long.parseLong(parts[1]);
-                    if (ts >= fromM && ts <= toM) {
-                        String gateway = key.split(":")[1];
-                        return Map.entry(gateway, amount);
-                    }
-                    return null;
-                }));
-            }
+        long fromM = from == null ? 0L : from.toEpochMilli();
+        long toM = to == null ? Long.MAX_VALUE : to.toEpochMilli();
 
-            CompositeFutureImpl.all(futures.toArray(new Future[0])).onComplete(ar -> {
-                if (ar.succeeded()) {
-                    Map<String, List<Long>> grouped = new HashMap<>();
-                    for (int i = 0; i < ar.result().size(); i++) {
-                        var entry = (Map.Entry<String, Long>) ar.result().resultAt(i);
-                        if (entry != null) {
-                            grouped.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).add(entry.getValue());
+        List<Future> futures = new ArrayList<>();
+        for (String gateway : gateways) {
+            String zsetKey = "payments:" + gateway;
+            futures.add(this.redisAPI.zrangebyscore(Arrays.asList(zsetKey, String.valueOf(fromM), String.valueOf(toM))));
+        }
+
+        CompositeFutureImpl.all(futures.toArray(new Future[0])).onComplete(ar -> {
+            if (ar.succeeded()) {
+                Map<String, PaymentSummary> summaryByGateway = new LinkedHashMap<>();
+                for (int i = 0; i < gateways.size(); i++) {
+                    String gateway = gateways.get(i);
+                    // Use Response type, not List
+                    Response response = ar.result().resultAt(i);
+                    long totalAmount = 0;
+                    int count = 0;
+                    if (response != null && response.size() > 0) {
+                        for (int j = 0; j < response.size(); j++) {
+                            String member = response.get(j).toString();
+                            String[] parts = member.split(":");
+                            if (parts.length >= 1) {
+                                totalAmount += Long.parseLong(parts[0]);
+                                count++;
+                            }
                         }
                     }
-                    for (var e : grouped.entrySet()) {
-                        long totalAmount = e.getValue().stream().mapToLong(Long::longValue).sum();
-                        double totalFormatted = BigDecimal.valueOf(totalAmount).movePointLeft(2)
-                                .setScale(2, RoundingMode.HALF_UP).doubleValue();
-                        tempMap.put(e.getKey(), new PaymentSummary(e.getValue().size(), totalFormatted));
-                    }
-
-                    Map<String, PaymentSummary> summaryByGateway = new LinkedHashMap<>();
-                    summaryByGateway.put(PROCESSOR_GATEWAY_SELECTED_DEFAULT, new PaymentSummary(0, 0.0));
-                    summaryByGateway.put(PROCESSOR_GATEWAY_SELECTED_FALLBACK, new PaymentSummary(0, 0.0));
-                    if (tempMap.containsKey("default")) {
-                        summaryByGateway.put("default", tempMap.get("default"));
-                    }
-                    tempMap.keySet().stream()
-                            .filter(gw -> !gw.equals("default"))
-                            .sorted()
-                            .forEach(gw -> summaryByGateway.put(gw, tempMap.get(gw)));
-
-                    promise.complete(new PaymentSummaryByGatewayResponse(summaryByGateway));
-                } else {
-                    promise.fail(ar.cause());
+                    double totalFormatted = BigDecimal.valueOf(totalAmount).movePointLeft(2)
+                            .setScale(2, RoundingMode.HALF_UP).doubleValue();
+                    summaryByGateway.put(gateway, new PaymentSummary(count, totalFormatted));
                 }
-            });
+                promise.complete(new PaymentSummaryByGatewayResponse(summaryByGateway));
+            } else {
+                promise.fail(ar.cause());
+            }
         });
         return promise.future();
+    }
+
+    private void ensureConsumerGroupExists() {
+        this.redisAPI.xreadgroup(Arrays.asList(PAYMENT_QUEUE)).onComplete(groupsRes -> {
+            boolean groupExists = false;
+            if (groupsRes.succeeded() && groupsRes.result() != null) {
+                for (var groupInfo : groupsRes.result()) {
+                    if (groupInfo != null && groupInfo.toString().contains(CONSUMER_GROUP)) {
+                        groupExists = true;
+                        break;
+                    }
+                }
+            }
+            if (!groupExists) {
+                this.redisAPI.xgroup(Arrays.asList(
+                        "CREATE", PAYMENT_QUEUE, CONSUMER_GROUP, "$", "MKSTREAM"
+                )).onComplete(res -> {
+                    if (res.succeeded()) {
+                        Environment.processLogging(
+                                logger,
+                                "Consumer group created successfully: " + CONSUMER_GROUP
+                        );
+                    } else {
+                        Environment.processLogging(
+                                logger,
+                                "Failed to create consumer group: " + CONSUMER_GROUP + ", Error: " + res.cause().getMessage()
+                        );
+                    }
+                });
+            } else {
+                Environment.processLogging(
+                        logger,
+                        "Consumer group already exists: " + CONSUMER_GROUP
+                );
+            }
+        });
     }
 
 }

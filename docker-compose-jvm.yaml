@@ -1,5 +1,15 @@
 # This file is part of the payment API proxy project.
 # 'nodeX', 'nodeY', representing the payment API proxy nodes, are designed to handle requests and route them to the appropriate payment processor.
+#-XX:+UseZGC: GC de baixa latência.
+#-XX:MaxGCPauseMillis=1: Pausas de GC muito curtas.
+#-XX:+AlwaysPreTouch: Aloca memória antecipadamente.
+#-XX:+UseNUMA: Otimiza para múltiplos núcleos.
+#-XX:+PerfDisableSharedMem: Desabilita métricas que podem causar overhead.
+#-XX:+DisableExplicitGC: Ignora chamadas explícitas de GC.
+#-XX:+TieredCompilation: Melhora o tempo de aquecimento do JIT.
+#-XX:ActiveProcessorCount=2: Limita núcleos (ajuste conforme seu ambiente).
+#-Djava.net.preferIPv4Stack=true: Evita delays de IPv6.
+
 services:
   nginx:
     image: nginx:latest
@@ -18,7 +28,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.10'
+          cpus: '0.1'
           memory: 50MB
 
   node1: &node-pointer
@@ -33,7 +43,10 @@ services:
       - PROCESSOR_FALLBACK=http://payment-processor-fallback:8080
       - ENABLE_LOGGING=false
       - HTTP_CLIENT_CONNECT_TIMEOUT=5000
-      - REDIS_MAX_TOTAL=500
+      - REDIS_MAX_TOTAL=5000
+      - JAVAARGS=-XX:+UseZGC -Xms32m -Xmx90m -XX:MaxGCPauseMillis=1 -XX:+AlwaysPreTouch -XX:+UseNUMA -XX:+PerfDisableSharedMem -XX:+DisableExplicitGC -XX:+TieredCompilation -Djava.net.preferIPv4Stack=true
+      - HTTP_CLIENT_POOL_SIZE=1000
+      - PROCESSOR_CONSUMER_INSTANCES=3
     networks:
       - backend
       - payment-processor
@@ -54,7 +67,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.7'
+          cpus: '0.5'
           memory: 100MB
 
   node2:
@@ -75,7 +88,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.10'
+          cpus: '0.4'
           memory: 100MB
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

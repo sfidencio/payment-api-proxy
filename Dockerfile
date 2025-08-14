@@ -1,11 +1,31 @@
-FROM eclipse-temurin:24-jre-alpine
+FROM ghcr.io/graalvm/native-image-community:24 AS builder
 
 WORKDIR /app
 
-COPY target/payment-api-proxy.jar /app/payment-api-proxy.jar
+COPY . .
 
-ENV JAVAARGS=""
+RUN native-image \
+    --no-fallback \
+    --gc=serial \
+    -jar target/payment-api-proxy.jar \
+    -H:Name=payment-api-proxy-runner \
+    -H:ReflectionConfigurationFiles=src/main/resources/META-INF/native-image/reflect-config.json \
+    -H:+ReportUnsupportedElementsAtRuntime \
+    --enable-http \
+    --enable-https \
+    --enable-all-security-services \
+    -H:IncludeResources=META-INF/vertx/vertx-version.txt \
+    -R:MaxHeapSize=20m \
+    -R:MaxNewSize=8m
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/payment-api-proxy-runner /app/payment-api-proxy-runner
+
+RUN chmod +x /app/payment-api-proxy-runner
 
 EXPOSE 8080
 
-CMD sh -c "java $JAVAARGS -jar /app/payment-api-proxy.jar"
+CMD ["./payment-api-proxy-runner"]

@@ -17,8 +17,9 @@ public class RedisClientProvider {
                     .setConnectionString("redis://" +
                             Environment.getEnv(REDIS_HOST) + ":" +
                             Environment.getEnv(REDIS_PORT))
-                    .setMaxPoolSize(
-                            Integer.parseInt(Environment.getEnv(REDIS_MAX_TOTAL)));
+                    .setMaxPoolSize(Environment.getEnv(
+                            REDIS_MAX_TOTAL) != null ? Integer.parseInt(Environment.getEnv(REDIS_MAX_TOTAL)) : 10)
+                    .setPoolCleanerInterval(10000); // 10 seconds
             client = Redis.createClient(vertx, options);
         }
         return client;
