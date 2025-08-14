@@ -8,7 +8,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # 3. Log in to Docker Hub (replace USERNAME with your user)
-echo "QWRtU2ViMjVAQCM=" | base64 -d | docker login -u sfidencio --password-stdin
+echo "" | base64 -d | docker login -u sfidencio --password-stdin
 #docker login -u sfidencio
 
 ## 4. Check if the login was successful

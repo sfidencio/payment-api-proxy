@@ -17,7 +17,7 @@ Este projeto é implementado **sem frameworks pesados** (nada de Spring, Quarkus
 - **Reatividade real:** Processamento totalmente assíncrono e não bloqueante, ideal para alta concorrência.
 - **Baixíssimo overhead:** Sem camadas extras, sem reflection, sem injeção de dependências pesada.
 - **Startup instantâneo:** Perfeito para ambientes serverless e alta disponibilidade.
-- **Consumo mínimo de memória:** Ideal para containers com limites rígidos de recursos.
+- **Consumo mínimo de memória:** Ideal para containers com limites rígidos de recursos.git push origin --delete feature-x
 - **Controle total:** Permite otimizações customizadas para performance e latência.
 
 ## Arquitetura 🏗️
