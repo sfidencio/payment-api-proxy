@@ -18,7 +18,112 @@
     "allPublicMethods": true
   },
   {
+    "name": "dto.PaymentMessage",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "dto.PaymentProcessorResponse",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "dto.PaymentSummary",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "dto.PaymentSummaryByGatewayResponse",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "dto.GatewaySelected",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
     "name": "handler.PaymentHandler",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "handler.PaymentSummaryHandler",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "repository.IPaymentRepository",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "repository.IHealthCheckRepository",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "repository.impl.PaymentRepositoryImpl",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.HealthCheckService",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.producer.PaymentServiceImpl",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.producer.IPaymentService",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.processor.PaymentProcessImpl",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.processor.IPaymentProcess",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "service.consumer.PaymentProcessorVerticle",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "config.WebClientProvider",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "config.PaymentDependencies",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
@@ -31,15 +136,6 @@
     "name": "config.HttpClientBuild",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
-  },
-  {
-    "name": "service.HealthCheckService",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true
-  },
-  {
-    "name": "org.apache.commons.pool2.impl.DefaultEvictionPolicy",
-    "allDeclaredConstructors": true
   },
   {
     "name": "io.vertx.core.http.HttpVersion",
@@ -57,6 +153,96 @@
   },
   {
     "name": "io.vertx.ext.web.client.impl.WebClientBase",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.apache.commons.pool2.impl.DefaultEvictionPolicy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueProducerFields",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueConsumerFields",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueColdProducerFields",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueue",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueueProducerIndexFields",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueueConsumerIndexFields",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.MpscBlockingConsumerArrayQueue",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.util.internal.shaded.org.jctools.queues.MpscBlockingProducerArrayQueue",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.buffer.PooledByteBufAllocator",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.buffer.UnpooledHeapByteBuf",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.channel.nio.NioEventLoop",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.channel.DefaultChannelPipeline",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.vertx.sqlclient.impl.SqlClientImpl",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.vertx.sqlclient.impl.RowImpl",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.vertx.sqlclient.impl.TupleInternal",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.vertx.sqlclient.impl.command.CommandBase",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.netty.buffer.ByteBufAllocator",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.netty.buffer.PooledByteBufAllocator",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.netty.buffer.UnpooledByteBufAllocator",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   }
 ]

@@ -31,8 +31,10 @@ public class DatabaseProvider {
                     connectOptions,
                     poolOptions
             );
+
+            buildSchema();
         }
-        buildSchema();
+
         return instance;
     }
 

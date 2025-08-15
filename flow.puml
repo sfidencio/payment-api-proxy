@@ -1,0 +1,59 @@
+@startuml
+actor Cliente
+participant "Application" as App
+participant "PaymentHandler" as Handler
+participant "PaymentServiceImpl" as Service
+participant "PaymentRepositoryImpl" as Repo
+database "Banco de Dados" as DB
+participant "PaymentProcessorVerticle" as Consumer
+participant "PaymentProcessImpl\n(WebClient)" as Gateway
+
+== Enfileiramento de pagamento ==
+
+Cliente -> App: POST /payments (PaymentRequest)
+App -> Handler: HTTP request
+Handler -> Service: enqueue(PaymentRequest)
+Service -> Repo: enqueue(PaymentRequest)
+Repo -> DB: INSERT INTO payment_queue ...
+DB --> Repo: Sucesso/Falha
+Repo --> Service: Future<Boolean>
+Service --> Handler: Future<Boolean>
+alt Sucesso
+    Handler --> App: HTTP 200 (Enqueued)
+    App --> Cliente: HTTP 200
+else Falha
+    Handler --> App: HTTP 500 (Erro)
+    App --> Cliente: HTTP 500
+end
+
+== Processamento do pagamento (Consumer) ==
+
+Consumer -> Repo: consumeBatch()
+Repo -> DB: SELECT ... FOR UPDATE SKIP LOCKED
+DB --> Repo: Mensagens pendentes
+Repo --> Consumer: Lista PaymentMessage
+
+loop Para cada PaymentMessage
+    Consumer -> Service: process(PaymentRequest)
+    Service -> Gateway: process(PaymentRequest)
+    Gateway -> Gateway: Escolhe melhor gateway (HealthCheck)
+    Gateway -> Gateway: POST externo (WebClient)
+    Gateway --> Service: PaymentProcessorResponse
+    alt Sucesso ou erro 422
+        Service -> Repo: save(PaymentRequest)
+        Repo -> DB: INSERT INTO payments ...
+        DB --> Repo: Sucesso/Falha
+        Repo --> Service: Future<Boolean>
+        Service --> Consumer: Future<Boolean>
+        Consumer -> Repo: ack(messageID)
+        Repo -> DB: DELETE FROM payment_queue WHERE id=...
+        DB --> Repo: Sucesso
+        Repo --> Consumer: Void
+    else Falha (outros erros)
+        Consumer -> Repo: incrementRetryCount(messageID)
+        Repo -> DB: UPDATE payment_queue SET retry_count=retry_count+1 ...
+        DB --> Repo: retry_count atualizado
+        Repo --> Consumer: retry_count
+    end
+end
+@enduml

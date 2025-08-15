@@ -18,6 +18,11 @@ public class PaymentSummaryHandler implements io.vertx.core.Handler<RoutingConte
 
     @Override
     public void handle(RoutingContext ctx) {
+        //ConsumerControl.paused = true;
+        Environment.processLogging(
+                logger,
+                "Processing payment summary request. Consumer control paused."
+        );
         String from = ctx.request().getParam("from");
         String to = ctx.request().getParam("to");
         try {
@@ -57,6 +62,12 @@ public class PaymentSummaryHandler implements io.vertx.core.Handler<RoutingConte
                     logger,
                     "Failed to process payment summary request: " + e.getMessage()
             );
+        }finally {
+//            ConsumerControl.paused = false;
+//            Environment.processLogging(
+//                    logger,
+//                    "Payment summary request completed. Consumer control resumed."
+//            );
         }
     }
 }

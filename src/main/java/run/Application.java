@@ -96,19 +96,6 @@ public class Application {
 
     }
 
-    /**
-     * Realiza o deploy dos verticles responsáveis pelo processamento de pagamentos.
-     * <p>
-     * O número de instâncias é definido pela variável de ambiente PROCESSOR_CONSUMER_INSTANCES.
-     * Cada verticle é identificado por um nome único ("PaymentProcessorVerticle-<n>") e é
-     * implantado com uma instância isolada, permitindo processamento concorrente e escalável
-     * das mensagens de pagamento enfileiradas.
-     * <br>
-     * Caso a variável de ambiente não esteja definida, será utilizada uma instância por padrão.
-     * </p>
-     *
-     * @param vertx Instância do Vert.x utilizada para o deploy dos verticles.
-     */
     private static void deployPaymentProcessorVerticles(Vertx vertx) {
         int instances = Environment.getEnv(
                 PROCESSOR_CONSUMER_INSTANCES) != null ?
@@ -122,20 +109,11 @@ public class Application {
             String consumerName = "PaymentProcessorVerticle-" + i;
             vertx.deployVerticle(
                     new PaymentProcessorVerticle(consumerName),
-                    new DeploymentOptions().setInstances(1)); // Cada verticle roda em sua própria instância
+                    new DeploymentOptions().setInstances(1)); // Each verticle runs in its own instance
 
         }
     }
 
-    /**
-     * Configura o formato do logging global da aplicação.
-     * <p>
-     * Define o Vert.x global na classe de ambiente e ajusta o formato do SimpleFormatter
-     * do java.util.logging para exibir data, hora, nome da thread e mensagem.
-     * </p>
-     *
-     * @param vertx Instância do Vert.x utilizada para configuração global.
-     */
     public static void configureLogging(Vertx vertx) {
         Environment.vertx = vertx;
         System.setProperty("java.util.logging.SimpleFormatter.format", "%1$tF %1$tT [%3$s] %5$s%n");

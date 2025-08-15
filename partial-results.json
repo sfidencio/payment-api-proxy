@@ -1,20 +1,20 @@
 {
   "participante": "anonymous",
-  "total_liquido": 9.26345,
-  "total_bruto": 9.751,
-  "total_taxas": 0.48755,
+  "total_liquido": 193.0484075,
+  "total_bruto": 312.629,
+  "total_taxas": 15.63145,
   "descricao": "'total_liquido' é sua pontuação final. Equivale ao seu lucro. Fórmula: total_liquido + (total_liquido * p99.bonus) - (total_liquido * multa.porcentagem)",
   "p99": {
-    "valor": "588.16ms",
+    "valor": "515.56ms",
     "bonus": "0%",
     "max_requests": 500,
     "descricao": "Fórmula para o bônus: max((11 - p99.valor) * 0.02, 0)"
   },
   "multa": {
-    "porcentagem": 0,
-    "total": 0,
+    "porcentagem": 0.35,
+    "total": 103.9491425,
     "composicao": {
-      "num_inconsistencias": 0,
+      "num_inconsistencias": 20,
       "descricao": "Se 'num_inconsistencias' > 0, há multa de 35%."
     }
   },
@@ -23,20 +23,20 @@
     "descricao": "Se 'lag' for negativo, significa que seu backend registrou mais pagamentos do que solicitado, automaticamente desclassificando sua submissão!"
   },
   "lag": {
-    "num_pagamentos_total": 49,
-    "num_pagamentos_solicitados": 76,
-    "lag": 27,
+    "num_pagamentos_total": 1571,
+    "num_pagamentos_solicitados": 4276,
+    "lag": 2705,
     "descricao": "Lag é a diferença entre a quantidade de solicitações de pagamentos e o que foi realmente computado pelo backend. Mostra a perda de pagamentos possivelmente por estarem enfileirados."
   },
   "pagamentos_solicitados": {
-    "qtd_sucesso": 76,
-    "qtd_falha": 0,
+    "qtd_sucesso": 4276,
+    "qtd_falha": 20,
     "descricao": "'qtd_sucesso' foram requests bem sucedidos para 'POST /payments' e 'qtd_falha' os requests com erro."
   },
   "pagamentos_realizados_default": {
-    "total_bruto": 9.751,
-    "num_pagamentos": 49,
-    "total_taxas": 0.48755,
+    "total_bruto": 312.629,
+    "num_pagamentos": 1571,
+    "total_taxas": 15.63145,
     "descricao": "Informações do backend sobre solicitações de pagamento para o Payment Processor Default."
   },
   "pagamentos_realizados_fallback": {

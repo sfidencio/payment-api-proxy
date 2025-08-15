@@ -15,8 +15,8 @@ RUN native-image \
     --enable-https \
     --enable-all-security-services \
     -H:IncludeResources=META-INF/vertx/vertx-version.txt \
-    -R:MaxHeapSize=20m \
-    -R:MaxNewSize=8m
+    -R:MaxHeapSize=48m \
+    -R:MaxNewSize=16m
 
 FROM debian:bookworm-slim
 

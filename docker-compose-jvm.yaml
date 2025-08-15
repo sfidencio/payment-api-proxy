@@ -1,15 +1,3 @@
-# This file is part of the payment API proxy project.
-# 'nodeX', 'nodeY', representing the payment API proxy nodes, are designed to handle requests and route them to the appropriate payment processor.
-#-XX:+UseZGC: GC de baixa latência.
-#-XX:MaxGCPauseMillis=1: Pausas de GC muito curtas.
-#-XX:+AlwaysPreTouch: Aloca memória antecipadamente.
-#-XX:+UseNUMA: Otimiza para múltiplos núcleos.
-#-XX:+PerfDisableSharedMem: Desabilita métricas que podem causar overhead.
-#-XX:+DisableExplicitGC: Ignora chamadas explícitas de GC.
-#-XX:+TieredCompilation: Melhora o tempo de aquecimento do JIT.
-#-XX:ActiveProcessorCount=2: Limita núcleos (ajuste conforme seu ambiente).
-#-Djava.net.preferIPv4Stack=true: Evita delays de IPv6.
-
 services:
   nginx:
     image: nginx:latest
@@ -25,11 +13,15 @@ services:
     networks:
       - backend
       - payment-processor
-    deploy:
-      resources:
-        limits:
-          cpus: '0.1'
-          memory: 50MB
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.1'
+#          memory: 50MB
 
   node1: &node-pointer
     hostname: node1
@@ -37,38 +29,41 @@ services:
     container_name: node1
     environment:
       - APP_PORT=8080
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - PROCESSOR_DEFAULT=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK=http://payment-processor-fallback:8080
-      - ENABLE_LOGGING=false
-      - HTTP_CLIENT_CONNECT_TIMEOUT=5000
-      - REDIS_MAX_TOTAL=5000
-      - JAVAARGS=-XX:+UseZGC -Xms32m -Xmx90m -XX:MaxGCPauseMillis=1 -XX:+AlwaysPreTouch -XX:+UseNUMA -XX:+PerfDisableSharedMem -XX:+DisableExplicitGC -XX:+TieredCompilation -Djava.net.preferIPv4Stack=true
-      - HTTP_CLIENT_POOL_SIZE=1000
-      - PROCESSOR_CONSUMER_INSTANCES=3
+      - ENABLE_LOGGING=true
+      - HTTP_CLIENT_CONNECT_TIMEOUT=500
+      - HTTP_CLIENT_POOL_SIZE=100
+      - PROCESSOR_CONSUMER_INSTANCES=2
+      - POSTGRES_DB=paymentdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pay@@!
+      - POSTGRES_HOST=pgsql
+      - POSTGRES_PORT=5432
+      - MAX_RETRIES_REENQUEUE=3
+      - POSTGRES_MAX_POOL_SIZE=10
+      - JAVAARGS=-XX:+UseG1GC -Xms32m -Xmx1024m -XX:MaxGCPauseMillis=1 -XX:+AlwaysPreTouch -XX:+UseStringDeduplication -XX:+DisableExplicitGC -Djava.net.preferIPv4Stack=true
     networks:
       - backend
       - payment-processor
     ulimits:
       nofile:
-        soft: 65536
-        hard: 65536
-    oom_score_adj:
-        -1000
+        soft: 4096
+        hard: 4096
+    oom_score_adj: -1000
     sysctls:
-      net.core.somaxconn: 1024
+      net.core.somaxconn: 512
       net.ipv4.tcp_tw_reuse: 1
     ports:
       - "8081:8080"
     depends_on:
-      redis:
+      pgsql:
         condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 100MB
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: 100MB
 
   node2:
     <<: *node-pointer
@@ -76,26 +71,37 @@ services:
     container_name: node2
     ports:
       - "8082:8080"
-  redis:
-    image: redis:alpine
-    container_name: redis
-    command: redis-server --save "" --appendonly no --maxclients 1000 --maxmemory 100mb
-    ports:
-      - "6379:6379"
-    networks:
-      - backend
-      - payment-processor
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 100MB
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
 
+  pgsql:
+    image: postgres:16-alpine
+    hostname: pgsql
+    container_name: pgsql
+    networks:
+      - backend
+      - payment-processor
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pay@@!
+    ports:
+      - "5434:5432"
+    restart: always
+    command: ["postgres", "-c", "max_connections=120", "-c", "shared_buffers=24MB", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=8MB", "-c", "effective_cache_size=64MB", "-c", "wal_buffers=1MB", "-c", "max_wal_size=64MB", "-c", "min_wal_size=32MB"]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.4'
+#          memory: 100MB
 
 networks:
   backend:

@@ -92,10 +92,18 @@ public class PaymentProcessorVerticle extends AbstractVerticle {
     }
 
     private void processBatch() {
-        this.paymentRepository.consumeBatch(100, this.consumerName).onSuccess(reqs -> {
+
+//        if (ConsumerControl.paused) {
+//            // Se o consumidor estiver pausado, não faz nada e aguarda a próxima chamada
+//            Environment.processLogging(logger, "Consumer is paused. Waiting for resumption...");
+//            vertx.setTimer(100, t -> processBatch());
+//            return;
+//        }
+
+        this.paymentRepository.consumeBatch(30, this.consumerName).onSuccess(reqs -> {
             if (reqs.isEmpty()) {
-                // Se não há mensagens, agenda para tentar novamente em 10ms
-                vertx.setTimer(10, t -> processBatch());
+                // Se não há mensagens, agenda para tentar novamente em 100ms
+                vertx.setTimer(100, t -> processBatch());
                 return;
             }
             AtomicInteger processed = new AtomicInteger();
